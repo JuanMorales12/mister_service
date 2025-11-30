@@ -218,7 +218,7 @@ export const Header: React.FC = () => {
                   {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
                 </button>
                 {isMenuOpen && (
-                  <div className="absolute left-0 z-[9999] mt-2 w-72 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none flex flex-col max-h-[calc(100vh-5rem)]">
+                  <div className="absolute left-0 z-[9999] mt-2 w-72 max-w-[calc(100vw-2rem)] origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none flex flex-col max-h-[calc(100vh-5rem)]">
                      {/* Mobile-only header section in dropdown */}
                     <div className="p-4 space-y-4 border-b md:hidden flex-shrink-0">
                         <div className="text-center">

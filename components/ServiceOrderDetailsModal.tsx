@@ -142,7 +142,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl relative max-h-[90vh] flex flex-col">
+        <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl relative max-h-[90vh] flex flex-col">
           <header className="flex justify-between items-start pb-4 border-b">
               <div>
                 <h2 className="text-2xl font-bold text-slate-700 flex items-center gap-2">

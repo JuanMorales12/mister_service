@@ -49,7 +49,7 @@ const StatusDropdown: React.FC<{ orderId: string, currentStatus: ServiceOrderSta
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={currentStatus === 'Cancelado'}
-                className={`flex items-center justify-between w-32 text-xs font-medium py-1.5 px-3 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${colors.bg} ${colors.text} ${colors.hover} ${colors.ring} disabled:opacity-70 disabled:cursor-not-allowed`}
+                className={`flex items-center justify-between min-w-[8rem] text-xs font-medium py-2 px-3 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${colors.bg} ${colors.text} ${colors.hover} ${colors.ring} disabled:opacity-70 disabled:cursor-not-allowed whitespace-nowrap`}
             >
                 <span>{currentStatus}</span>
                 <ChevronDown size={14} />
