@@ -67,8 +67,8 @@ export const ProductManagement: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-slate-500">
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <table className="w-full text-sm text-left text-slate-500 min-w-[600px]">
                         <thead className="text-xs text-slate-700 uppercase bg-slate-50">
                             <tr>
                                 <th className="px-4 py-3">Código</th>
@@ -85,20 +85,22 @@ export const ProductManagement: React.FC = () => {
                                     <tr key={product.id} className="bg-white border-b hover:bg-slate-50">
                                         <td className="px-4 py-3 font-medium text-slate-900">{product.code}</td>
                                         <td className="px-4 py-3">{product.name}</td>
-                                        <td className="px-4 py-3 text-right">RD$ {product.purchasePrice.toFixed(2)}</td>
-                                        <td className="px-4 py-3 text-right">RD$ {product.sellPrice1.toFixed(2)}</td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap">RD$ {product.purchasePrice.toFixed(2)}</td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap">RD$ {product.sellPrice1.toFixed(2)}</td>
                                         <td className="px-4 py-3 text-center">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.stock > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                                 {product.stock}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 flex justify-center gap-2">
-                                            <button onClick={() => handleOpenEditModal(product)} className="p-1 text-slate-500 hover:text-sky-600" title="Editar">
-                                                <Edit size={16} />
-                                            </button>
-                                            <button onClick={() => handleDelete(product.id)} className="p-1 text-slate-500 hover:text-red-600" title="Eliminar">
-                                                <Trash2 size={16} />
-                                            </button>
+                                        <td className="px-4 py-3">
+                                            <div className="flex justify-center gap-2">
+                                                <button onClick={() => handleOpenEditModal(product)} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:text-sky-600" title="Editar">
+                                                    <Edit size={18} />
+                                                </button>
+                                                <button onClick={() => handleDelete(product.id)} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:text-red-600" title="Eliminar">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))

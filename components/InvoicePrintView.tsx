@@ -140,17 +140,30 @@ export const InvoicePrintView: React.FC = () => {
             <style>{`
                 .print-container {
                     background-color: #e2e8f0;
-                    padding: 2rem;
+                    padding: 0.5rem;
+                }
+                @media (min-width: 768px) {
+                    .print-container {
+                        padding: 2rem;
+                    }
                 }
                 .A4-sheet {
                     background: white;
-                    width: 210mm;
-                    height: 297mm;
+                    width: 100%;
+                    max-width: 210mm;
+                    min-height: 297mm;
                     margin: 0 auto;
-                    padding: 1.5cm;
+                    padding: 1rem;
                     box-shadow: 0 0 0.5cm rgba(0,0,0,0.5);
                     display: flex;
                     flex-direction: column;
+                }
+                @media (min-width: 768px) {
+                    .A4-sheet {
+                        width: 210mm;
+                        height: 297mm;
+                        padding: 1.5cm;
+                    }
                 }
                 @media print {
                     body * {

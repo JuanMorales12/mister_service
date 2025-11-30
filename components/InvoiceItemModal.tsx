@@ -84,7 +84,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({ isOpen, onCl
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-            <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-xl w-full max-w-[calc(100vw-2rem)] sm:max-w-lg">
                 <header className="flex justify-between items-center p-4 border-b">
                     <h2 className="text-xl font-bold">{itemToEdit ? 'Editar Ítem' : 'Añadir Ítem a la Factura'}</h2>
                     <button type="button" onClick={onClose}><X size={20}/></button>

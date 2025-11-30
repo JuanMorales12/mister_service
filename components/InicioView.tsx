@@ -89,38 +89,57 @@ const DonutChart: React.FC<{ percent: number, color: string, size?: number }> = 
 
 const SalesBarChart: React.FC<{ salesData: number[], purchaseData: number[], labels: string[] }> = ({ salesData, purchaseData, labels }) => {
     const maxVal = Math.max(...salesData, ...purchaseData, 1000);
-    
+
+    // Determinar si necesitamos comprimir las etiquetas
+    const isCompact = labels.length > 12;
+    const barMaxWidth = isCompact ? '8px' : '16px';
+    const labelRotation = isCompact ? '-45deg' : '0deg';
+
     return (
-        <div className="relative h-64 w-full">
+        <div className="relative w-full" style={{ height: isCompact ? '280px' : '256px' }}>
             {/* Grid lines */}
-            <div className="absolute inset-0 flex flex-col justify-between text-xs text-slate-400 pointer-events-none">
+            <div className="absolute inset-0 flex flex-col justify-between text-xs text-slate-400 pointer-events-none pl-10 sm:pl-10" style={{ paddingBottom: isCompact ? '48px' : '32px' }}>
                 {[1, 0.75, 0.5, 0.25, 0].map((tick) => (
-                    <div key={tick} className="flex items-center w-full border-b border-slate-100 h-full">
-                        <span className="absolute -left-10 w-8 text-right">{Math.round(maxVal * tick).toLocaleString('en-US', { notation: "compact" })}</span>
+                    <div key={tick} className="flex items-center w-full border-b border-slate-100 h-full relative">
+                        <span className="absolute -left-10 w-8 text-right text-[10px] sm:text-xs">{Math.round(maxVal * tick).toLocaleString('en-US', { notation: "compact" })}</span>
                     </div>
                 ))}
             </div>
-            
+
             {/* Bars */}
-            <div className="absolute inset-0 flex items-end justify-between pl-2 pt-4">
+            <div className="absolute inset-0 flex items-end justify-between pl-10 sm:pl-10 pt-4" style={{ paddingBottom: isCompact ? '48px' : '32px' }}>
                 {labels.map((label, i) => (
                     <div key={i} className="flex flex-col items-center w-full h-full justify-end group relative">
                          {/* Tooltip */}
                         <div className="absolute bottom-full mb-2 hidden group-hover:block bg-slate-800 text-white text-xs rounded p-2 z-10 whitespace-nowrap">
                            Ventas: {salesData[i].toLocaleString()}<br/>Compras: {purchaseData[i].toLocaleString()}
                         </div>
-                        
-                        <div className="flex gap-1 items-end h-full w-full justify-center px-1">
-                            <div 
-                                className="w-full max-w-[16px] bg-sky-400 rounded-t-sm transition-all duration-500"
-                                style={{ height: `${(salesData[i] / maxVal) * 100}%` }}
+
+                        <div className="flex gap-0.5 items-end h-full w-full justify-center" style={{ maxWidth: isCompact ? '24px' : '40px' }}>
+                            <div
+                                className="w-full bg-sky-400 rounded-t-sm transition-all duration-500"
+                                style={{
+                                    height: `${(salesData[i] / maxVal) * 100}%`,
+                                    maxWidth: barMaxWidth
+                                }}
                             ></div>
-                            <div 
-                                className="w-full max-w-[16px] bg-pink-500 rounded-t-sm transition-all duration-500"
-                                style={{ height: `${(purchaseData[i] / maxVal) * 100}%` }}
+                            <div
+                                className="w-full bg-pink-500 rounded-t-sm transition-all duration-500"
+                                style={{
+                                    height: `${(purchaseData[i] / maxVal) * 100}%`,
+                                    maxWidth: barMaxWidth
+                                }}
                             ></div>
                         </div>
-                        <span className="text-[10px] text-slate-400 mt-2 rotate-[-30deg] origin-top-left w-full text-center">{label}</span>
+                        <span
+                            className="text-[8px] sm:text-[9px] text-slate-400 mt-2 block origin-bottom-left text-center leading-tight"
+                            style={{
+                                transform: `rotate(${labelRotation})`,
+                                transformOrigin: 'top center',
+                                maxWidth: isCompact ? '60px' : '100%',
+                                whiteSpace: 'pre-line'
+                            }}
+                        >{label}</span>
                     </div>
                 ))}
             </div>
@@ -138,7 +157,7 @@ export const InicioView: React.FC = () => {
     const { quotes, invoices, serviceOrders, setMode } = context;
 
     // --- Time range state for Sales/Purchases chart ---
-    const [range, setRange] = useState<'today' | 'week' | 'month' | 'year'>('year');
+    const [range, setRange] = useState<'today' | 'week' | 'month' | 'year'>('month');
 
     // --- 1. Calculate Metrics ---
     const metrics = useMemo(() => {
@@ -207,31 +226,39 @@ export const InicioView: React.FC = () => {
         const addPurchaseTotal = (inv: any) => inv.items.reduce((acc: number, item: any) => acc + (item.purchasePrice * item.quantity), 0);
 
         if (range === 'year') {
+            // Last 5 years (anual)
+            for (let i = 4; i >= 0; i--) {
+                const year = currentYear - i;
+                chartLabels.push(year.toString());
+                const yearInvoices = invoices.filter(inv => {
+                    const invDate = new Date(inv.date);
+                    return invDate.getFullYear() === year;
+                });
+                salesData.push(yearInvoices.reduce((s, inv) => s + inv.total, 0));
+                purchasesData.push(yearInvoices.reduce((s, inv) => s + addPurchaseTotal(inv), 0));
+            }
+        } else if (range === 'month') {
             // Last 12 months
+            let lastYear = -1;
             for (let i = 11; i >= 0; i--) {
                 const d = new Date(currentYear, currentMonth - i, 1);
                 const monthName = d.toLocaleString('es-ES', { month: 'short' });
                 const year = d.getFullYear();
-                chartLabels.push(`${monthName}/${year}`);
+
+                // Mostrar el año solo cuando cambia
+                if (year !== lastYear) {
+                    chartLabels.push(`${monthName}\n'${year.toString().slice(-2)}`);
+                    lastYear = year;
+                } else {
+                    chartLabels.push(monthName);
+                }
+
                 const monthInvoices = invoices.filter(inv => {
                     const invDate = new Date(inv.date);
                     return invDate.getMonth() === d.getMonth() && invDate.getFullYear() === year;
                 });
                 salesData.push(monthInvoices.reduce((s, inv) => s + inv.total, 0));
                 purchasesData.push(monthInvoices.reduce((s, inv) => s + addPurchaseTotal(inv), 0));
-            }
-        } else if (range === 'month') {
-            // Days of current month (up to today)
-            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-            for (let day = 1; day <= daysInMonth; day++) {
-                const d = new Date(currentYear, currentMonth, day);
-                chartLabels.push(day.toString());
-                const dayInvoices = invoices.filter(inv => {
-                    const invDate = new Date(inv.date);
-                    return invDate.getDate() === day && invDate.getMonth() === currentMonth && invDate.getFullYear() === currentYear;
-                });
-                salesData.push(dayInvoices.reduce((s, inv) => s + inv.total, 0));
-                purchasesData.push(dayInvoices.reduce((s, inv) => s + addPurchaseTotal(inv), 0));
             }
         } else if (range === 'week') {
             // Last 7 days including today

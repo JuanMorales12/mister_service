@@ -195,8 +195,8 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                                         <PlusCircle size={14} /> Agregar
                                     </button>
                                 </div>
-                                <div className="max-h-60 overflow-y-auto overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                <div className="max-h-60 overflow-y-auto overflow-x-auto -mx-4 sm:mx-0">
+                                    <table className="w-full text-sm min-w-[550px]">
                                         <thead className="bg-slate-100">
                                             <tr className="border-b">
                                                 <th className="p-2 text-left font-medium text-slate-500">Cant.</th>
@@ -211,11 +211,13 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                                                 <tr key={item.id} className="border-b last:border-b-0 hover:bg-slate-50">
                                                     <td className="p-2">{item.quantity}</td>
                                                     <td className="p-2">{item.description}</td>
-                                                    <td className="p-2 text-right">RD$ {item.sellPrice.toFixed(2)}</td>
-                                                    <td className="p-2 text-right font-medium">RD$ {(item.sellPrice * item.quantity).toFixed(2)}</td>
-                                                    <td className="p-2 text-center">
-                                                        <button type="button" onClick={() => handleEditItem(item)} className="p-1 text-slate-500 hover:text-sky-600"><Pencil size={14}/></button>
-                                                        <button type="button" onClick={() => handleRemoveItem(item.id)} className="p-1 text-slate-500 hover:text-red-600"><Trash2 size={14}/></button>
+                                                    <td className="p-2 text-right whitespace-nowrap">RD$ {item.sellPrice.toFixed(2)}</td>
+                                                    <td className="p-2 text-right font-medium whitespace-nowrap">RD$ {(item.sellPrice * item.quantity).toFixed(2)}</td>
+                                                    <td className="p-2">
+                                                        <div className="flex justify-center gap-1">
+                                                            <button type="button" onClick={() => handleEditItem(item)} className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-500 hover:text-sky-600"><Pencil size={16}/></button>
+                                                            <button type="button" onClick={() => handleRemoveItem(item.id)} className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-500 hover:text-red-600"><Trash2 size={16}/></button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
