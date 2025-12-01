@@ -3,7 +3,7 @@ import React, { useContext, useMemo, useState } from 'react';
 // NOTE: Importing from '../src/types' to ensure we use the SAME AppContext instance provided by src/App.tsx.
 // Previously this file imported from '../types' (root), creating a second, distinct context and always receiving null.
 import { AppContext, AppContextType } from '../src/types';
-import { Calendar as CalendarIcon, MoreHorizontal, ArrowRight } from 'lucide-react';
+import { Calendar as CalendarIcon, ArrowRight } from 'lucide-react';
 
 // --- Helper Components for Charts ---
 
@@ -400,11 +400,17 @@ export const InicioView: React.FC = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-2">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-slate-700">VENTAS / COMPRAS</h3>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                              {/* Simple Legend */}
                              <div className="flex items-center gap-1 text-xs text-slate-500"><div className="w-3 h-3 bg-sky-400 rounded-sm"></div> Ventas</div>
                              <div className="flex items-center gap-1 text-xs text-slate-500"><div className="w-3 h-3 bg-pink-500 rounded-sm"></div> Compras</div>
-                             <button className="text-slate-400 hover:text-slate-600 ml-2"><MoreHorizontal size={20} /></button>
+                             <button
+                                onClick={() => setMode('facturacion')}
+                                className="text-slate-400 hover:text-sky-600 ml-2 transition-colors"
+                                title="Ver Facturación"
+                            >
+                                <ArrowRight size={20} />
+                            </button>
                         </div>
                     </div>
                     
@@ -439,7 +445,13 @@ export const InicioView: React.FC = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                      <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-slate-700">BALANCE PENDIENTE</h3>
-                        <button className="text-slate-400 hover:text-slate-600"><MoreHorizontal size={20} /></button>
+                        <button
+                            onClick={() => setMode('facturacion')}
+                            className="text-slate-400 hover:text-sky-600 transition-colors"
+                            title="Ver Facturación"
+                        >
+                            <ArrowRight size={20} />
+                        </button>
                     </div>
                     
                     <div className="flex justify-center items-center gap-4 text-xs mb-6">
