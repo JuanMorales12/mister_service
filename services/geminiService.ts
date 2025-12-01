@@ -20,10 +20,11 @@ interface GeminiResponse {
 let ai: GoogleGenAI | null = null;
 const getAi = () => {
     if (!ai) {
-        if (!process.env.API_KEY) {
-            throw new Error("La variable de entorno API_KEY no está configurada");
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error("La variable de entorno GEMINI_API_KEY no está configurada");
         }
-        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        ai = new GoogleGenAI({ apiKey });
     }
     return ai;
 };
