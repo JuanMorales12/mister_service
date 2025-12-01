@@ -12,11 +12,11 @@ const PublicFormPage: React.FC = () => {
     const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
-        const apiKey = process.env.API_KEY;
+        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
         if (!apiKey) {
             setErrorMessage("No se pudo cargar el mapa. Falta la clave de API.");
             setPageState('error');
-            console.error("API_KEY for Google services is not available.");
+            console.error("VITE_GOOGLE_MAPS_API_KEY is not available.");
             return;
         }
         const scriptId = 'google-maps-script';

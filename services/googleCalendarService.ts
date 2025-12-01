@@ -1,5 +1,4 @@
 import { ServiceOrder, ServiceOrderStatus } from '../types';
-import { GOOGLE_CLIENT_ID } from '../config';
 
 declare global {
   interface Window {
@@ -7,7 +6,7 @@ declare global {
   }
 }
 
-const API_KEY = process.env.API_KEY;
+const API_KEY = import.meta.env.VITE_GOOGLE_CALENDAR_API_KEY;
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
 
@@ -72,12 +71,12 @@ export const GoogleCalendarService = {
   },
 
   initTokenClient(callback: (tokenResponse: any) => void): any {
-    if (!process.env.API_KEY) {
-        throw new Error("API_KEY no está configurada");
+    if (!API_KEY) {
+        throw new Error("VITE_GOOGLE_CALENDAR_API_KEY no está configurada");
     }
-    const clientId = GOOGLE_CLIENT_ID;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     if (!clientId) {
-        console.error("Falta el ID de Cliente de Google. Por favor, asegúrate de que la variable de entorno GOOGLE_CLIENT_ID esté configurada.");
+        console.error("Falta el ID de Cliente de Google. Por favor, asegúrate de que la variable de entorno VITE_GOOGLE_CLIENT_ID esté configurada.");
         return null;
     }
       
