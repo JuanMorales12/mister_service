@@ -84,17 +84,21 @@ const App: React.FC = () => {
 
   // Load Google Maps script
   useEffect(() => {
-    if (!process.env.API_KEY) {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
       setGlobalError("Falta la clave de API para los servicios de Google Maps.");
-      console.error("API_KEY for Google services is not set.");
+      console.error("VITE_GOOGLE_MAPS_API_KEY is not set.");
       return;
     }
     const scriptId = 'google-maps-script';
     if (!document.getElementById(scriptId)) {
         const script = document.createElement('script');
         script.id = scriptId;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
         script.async = true;
+        script.onerror = () => {
+          setGlobalError("Error al cargar Google Maps. Verifica la clave de API.");
+        };
         document.head.appendChild(script);
     }
   }, []);

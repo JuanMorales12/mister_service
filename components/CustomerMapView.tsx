@@ -39,32 +39,80 @@ export const CustomerMapView: React.FC = () => {
         const startOfDay = new Date(`${selectedDate}T00:00:00`);
         const endOfDay = new Date(`${selectedDate}T23:59:59`);
 
+        console.log('=== DEBUG MAP VIEW ===');
+        console.log('Selected Date:', selectedDate);
+        console.log('Start of Day:', startOfDay);
+        console.log('End of Day:', endOfDay);
+        console.log('Total Service Orders:', serviceOrders.length);
+
         const todaysOrders = serviceOrders
             .filter(order => {
-                if (!order.start) return false;
+                if (!order.start) {
+                    console.log('Order without start date:', order.id);
+                    return false;
+                }
                 const orderDate = new Date(order.start);
-                return orderDate >= startOfDay && orderDate <= endOfDay && ['Pendiente', 'En Proceso'].includes(order.status);
+                const isInDateRange = orderDate >= startOfDay && orderDate <= endOfDay;
+                const hasValidStatus = ['Pendiente', 'En Proceso'].includes(order.status);
+
+                console.log(`Order ${order.id}:`, {
+                    date: orderDate,
+                    isInDateRange,
+                    status: order.status,
+                    hasValidStatus,
+                    passed: isInDateRange && hasValidStatus
+                });
+
+                return isInDateRange && hasValidStatus;
             })
             .sort((a, b) => new Date(a.start!).getTime() - new Date(b.start!).getTime());
 
+        console.log('Todays Orders Count:', todaysOrders.length);
+
         const customerData: ScheduledCustomer[] = [];
+        const ordersWithoutCoordinates: string[] = [];
+
         todaysOrders.forEach(order => {
-            const customer = customers.find(c => c.id === order.customerId);
-            if (customer && customer.latitude != null && customer.longitude != null) {
+            // Priorizar coordenadas de la orden, luego del cliente
+            const lat = order.latitude ?? customers.find(c => c.id === order.customerId)?.latitude;
+            const lng = order.longitude ?? customers.find(c => c.id === order.customerId)?.longitude;
+
+            console.log(`Order ${order.id} coordinates:`, {
+                orderLat: order.latitude,
+                orderLng: order.longitude,
+                finalLat: lat,
+                finalLng: lng,
+                hasCoordinates: lat != null && lng != null
+            });
+
+            if (lat != null && lng != null) {
                 customerData.push({
                     orderId: order.id,
                     calendarId: order.calendarId,
                     createdById: order.createdById,
-                    lat: customer.latitude,
-                    lng: customer.longitude,
+                    lat: lat,
+                    lng: lng,
                     title: order.title,
-                    address: customer.address,
+                    address: order.customerAddress,
                     time: new Date(order.start!).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-                    customerName: customer.name,
+                    customerName: order.customerName,
                     serviceDescription: order.applianceType,
                 });
+            } else {
+                ordersWithoutCoordinates.push(`${order.customerName} - ${order.customerAddress}`);
             }
         });
+
+        if (ordersWithoutCoordinates.length > 0) {
+            console.warn('⚠️ Órdenes sin coordenadas (no aparecen en el mapa):');
+            ordersWithoutCoordinates.forEach(order => console.warn(`  - ${order}`));
+            console.warn('💡 Edita estas órdenes y selecciona la dirección del autocompletado para agregar coordenadas.');
+        }
+
+        console.log('Final Customer Data Count:', customerData.length);
+        console.log('Customer Data:', customerData);
+        console.log('=== END DEBUG ===');
+
         return customerData;
     }, [selectedDate, customers, serviceOrders]);
     
