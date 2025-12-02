@@ -18,32 +18,61 @@ export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> =
   const autocompleteRef = useRef<any>(null);
 
   useEffect(() => {
-    // Check if the Google Maps script is loaded and if the input element is available
-    if (window.google && window.google.maps && inputRef.current && !autocompleteRef.current) {
-      const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-        fields: ["formatted_address", "geometry"],
-        types: ["address"],
-        componentRestrictions: { country: "do" } // Restrict to Dominican Republic
-      });
-      autocompleteRef.current = autocomplete;
-
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (place && place.geometry) {
-          onPlaceSelected({
-            address: place.formatted_address || '',
-            latitude: place.geometry.location.lat(),
-            longitude: place.geometry.location.lng(),
+    const initializeAutocomplete = () => {
+      if (window.google && window.google.maps && window.google.maps.places && inputRef.current && !autocompleteRef.current) {
+        try {
+          const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+            fields: ["formatted_address", "geometry"],
+            types: ["address"],
+            componentRestrictions: { country: "do" } // Restrict to Dominican Republic
           });
+          autocompleteRef.current = autocomplete;
+
+          autocomplete.addListener('place_changed', () => {
+            const place = autocomplete.getPlace();
+            if (place && place.geometry) {
+              onPlaceSelected({
+                address: place.formatted_address || '',
+                latitude: place.geometry.location.lat(),
+                longitude: place.geometry.location.lng(),
+              });
+            }
+          });
+          return true;
+        } catch (error) {
+          console.error('Error initializing autocomplete:', error);
+          return false;
         }
-      });
+      }
+      return false;
+    };
+
+    // Try to initialize immediately
+    if (!initializeAutocomplete()) {
+      // If it fails, set up an interval to retry until Google Maps is ready
+      const checkInterval = setInterval(() => {
+        if (initializeAutocomplete()) {
+          clearInterval(checkInterval);
+        }
+      }, 100); // Check every 100ms
+
+      // Clean up interval after 10 seconds to avoid infinite checking
+      const timeout = setTimeout(() => {
+        clearInterval(checkInterval);
+      }, 10000);
+
+      return () => {
+        clearInterval(checkInterval);
+        clearTimeout(timeout);
+        if (window.google && window.google.maps && inputRef.current) {
+          window.google.maps.event.clearInstanceListeners(inputRef.current);
+        }
+      };
     }
 
     // Basic cleanup
     return () => {
       if (window.google && window.google.maps && inputRef.current) {
-        // The pac-container is notoriously hard to clean up in React.
-        // Clearing listeners is a safe minimum.
         window.google.maps.event.clearInstanceListeners(inputRef.current);
       }
     };
