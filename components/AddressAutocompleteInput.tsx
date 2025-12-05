@@ -23,8 +23,7 @@ export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> =
         try {
           const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
             fields: ["formatted_address", "geometry"],
-            types: ["address"],
-            componentRestrictions: { country: "do" } // Restrict to Dominican Republic
+            types: ["address"]
           });
           autocompleteRef.current = autocomplete;
 
