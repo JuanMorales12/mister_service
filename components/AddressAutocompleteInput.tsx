@@ -22,8 +22,9 @@ export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> =
       if (window.google && window.google.maps && window.google.maps.places && inputRef.current && !autocompleteRef.current) {
         try {
           const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-            fields: ["formatted_address", "geometry"],
-            types: ["address"]
+            fields: ["formatted_address", "geometry", "name"],
+            types: ["establishment", "geocode"],
+            componentRestrictions: { country: "do" }
           });
           autocompleteRef.current = autocomplete;
 
