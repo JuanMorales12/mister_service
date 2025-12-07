@@ -17,6 +17,7 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
 
     // Camera state
     const [isCameraActive, setIsCameraActive] = useState(false);
+    const [isCameraLoading, setIsCameraLoading] = useState(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -90,9 +91,12 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
     const startCamera = async () => {
         setError(null);
         setPhotoPreview(null);
+        setIsCameraLoading(true);
+
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
+
         try {
             // Request camera with mobile-friendly constraints
             const constraints = {
@@ -108,17 +112,40 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
 
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
-                // Wait for video metadata to load before showing
-                videoRef.current.onloadedmetadata = () => {
-                    videoRef.current?.play().catch(e => {
-                        console.error("Error playing video:", e);
-                        setError("Error al iniciar la vista de la cámara.");
-                    });
-                };
+
+                // Wait for video to be ready
+                await new Promise<void>((resolve, reject) => {
+                    if (!videoRef.current) {
+                        reject(new Error('Video element not found'));
+                        return;
+                    }
+
+                    videoRef.current.onloadedmetadata = () => {
+                        if (videoRef.current) {
+                            videoRef.current.play()
+                                .then(() => {
+                                    setIsCameraActive(true);
+                                    setIsCameraLoading(false);
+                                    resolve();
+                                })
+                                .catch((e) => {
+                                    console.error("Error playing video:", e);
+                                    reject(e);
+                                });
+                        }
+                    };
+
+                    // Timeout after 10 seconds
+                    setTimeout(() => {
+                        reject(new Error('Camera timeout'));
+                    }, 10000);
+                });
             }
-            setIsCameraActive(true);
         } catch (err: any) {
             console.error("Camera error:", err);
+            setIsCameraLoading(false);
+            setIsCameraActive(false);
+
             let errorMessage = "No se pudo acceder a la cámara.";
 
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -131,6 +158,8 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
                 errorMessage = "Tu cámara no soporta las configuraciones requeridas.";
             } else if (err.name === 'SecurityError') {
                 errorMessage = "Acceso a la cámara bloqueado por seguridad. Asegúrate de estar usando HTTPS.";
+            } else if (err.message === 'Camera timeout') {
+                errorMessage = "La cámara tardó demasiado en responder. Inténtalo de nuevo.";
             }
 
             setError(errorMessage);
@@ -236,30 +265,53 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
                         <div>
                             <label className="label-style">Foto de Prueba (Obligatorio)</label>
                             <div className="mt-2 flex flex-col items-center p-4 border-2 border-dashed border-slate-300 rounded-lg min-h-[200px] justify-center">
-                                {isCameraActive ? (
-                                    <div className="w-full">
-                                        <video ref={videoRef} autoPlay playsInline muted className="w-full h-auto rounded-md bg-black" />
-                                        <button type="button" onClick={takePhoto} className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
-                                            <Camera size={16} /> Capturar Foto
-                                        </button>
-                                    </div>
-                                ) : photoPreview ? (
+                                {photoPreview ? (
                                     <>
                                         <img src={photoPreview} alt="Vista previa" className="max-h-48 rounded-md mb-4"/>
-                                        <button type="button" onClick={startCamera} className="cursor-pointer text-sm font-medium text-sky-600 bg-sky-100 rounded-md px-4 py-2 hover:bg-sky-200 flex items-center gap-2">
+                                        <label htmlFor="camera-input" className="cursor-pointer text-sm font-medium text-sky-600 bg-sky-100 rounded-md px-4 py-2 hover:bg-sky-200 flex items-center gap-2">
                                             <RefreshCw size={14} /> Volver a tomar
-                                        </button>
+                                        </label>
                                     </>
                                 ) : (
                                     <div className="text-center text-slate-500">
                                         <Camera size={40} className="mx-auto"/>
                                         <p className="text-sm mt-2">Se requiere una foto en vivo del servicio completado.</p>
-                                        <button type="button" onClick={startCamera} className="mt-4 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700">
-                                            <Video size={16} /> Activar Cámara
-                                        </button>
+                                        <label htmlFor="camera-input" className="mt-4 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700 cursor-pointer">
+                                            <Camera size={16} /> Tomar Foto
+                                        </label>
                                     </div>
                                 )}
-                                <canvas ref={canvasRef} className="hidden"></canvas>
+                                <input
+                                    id="camera-input"
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = (event) => {
+                                                const img = new Image();
+                                                img.onload = () => {
+                                                    const canvas = document.createElement('canvas');
+                                                    const MAX_WIDTH = 800;
+                                                    const scale = MAX_WIDTH / img.width;
+                                                    canvas.width = MAX_WIDTH;
+                                                    canvas.height = img.height * scale;
+                                                    const ctx = canvas.getContext('2d');
+                                                    if (ctx) {
+                                                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                                                        setPhotoPreview(dataUrl);
+                                                    }
+                                                };
+                                                img.src = event.target?.result as string;
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }}
+                                    className="hidden"
+                                />
                             </div>
                         </div>
                     </main>
