@@ -94,26 +94,64 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
             stream.getTracks().forEach(track => track.stop());
         }
         try {
-            const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' } // Prefer back camera
-            });
+            // Request camera with mobile-friendly constraints
+            const constraints = {
+                video: {
+                    facingMode: 'environment', // Prefer back camera
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            };
+
+            const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(mediaStream);
+
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
+                // Wait for video metadata to load before showing
+                videoRef.current.onloadedmetadata = () => {
+                    videoRef.current?.play().catch(e => {
+                        console.error("Error playing video:", e);
+                        setError("Error al iniciar la vista de la cámara.");
+                    });
+                };
             }
             setIsCameraActive(true);
-        } catch (err) {
+        } catch (err: any) {
             console.error("Camera error:", err);
-            setError("No se pudo acceder a la cámara. Revisa los permisos en tu navegador.");
+            let errorMessage = "No se pudo acceder a la cámara.";
+
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                errorMessage = "Permiso de cámara denegado. Por favor, habilita los permisos de cámara en la configuración de tu navegador.";
+            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                errorMessage = "No se encontró ninguna cámara en tu dispositivo.";
+            } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                errorMessage = "La cámara está siendo usada por otra aplicación. Por favor, cierra otras apps que usen la cámara.";
+            } else if (err.name === 'OverconstrainedError') {
+                errorMessage = "Tu cámara no soporta las configuraciones requeridas.";
+            } else if (err.name === 'SecurityError') {
+                errorMessage = "Acceso a la cámara bloqueado por seguridad. Asegúrate de estar usando HTTPS.";
+            }
+
+            setError(errorMessage);
         }
     };
 
     const takePhoto = () => {
-        if (!videoRef.current || !canvasRef.current) return;
+        if (!videoRef.current || !canvasRef.current) {
+            setError("Error: La cámara no está lista. Inténtalo de nuevo.");
+            return;
+        }
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        
+
+        // Check if video is ready and has valid dimensions
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+            setError("La cámara aún no está lista. Espera un momento e inténtalo de nuevo.");
+            return;
+        }
+
         const MAX_WIDTH = 800;
         const scale = MAX_WIDTH / video.videoWidth;
         canvas.width = MAX_WIDTH;
@@ -122,10 +160,11 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
         const context = canvas.getContext('2d');
         if (context) {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.7); 
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
             setPhotoPreview(dataUrl);
         }
 
+        // Stop camera after taking photo
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
@@ -199,7 +238,7 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
                             <div className="mt-2 flex flex-col items-center p-4 border-2 border-dashed border-slate-300 rounded-lg min-h-[200px] justify-center">
                                 {isCameraActive ? (
                                     <div className="w-full">
-                                        <video ref={videoRef} autoPlay playsInline className="w-full h-auto rounded-md" />
+                                        <video ref={videoRef} autoPlay playsInline muted className="w-full h-auto rounded-md bg-black" />
                                         <button type="button" onClick={takePhoto} className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
                                             <Camera size={16} /> Capturar Foto
                                         </button>
