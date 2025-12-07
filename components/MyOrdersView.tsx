@@ -2,6 +2,7 @@ import React, { useContext, useMemo, useState, useRef, useEffect } from 'react';
 import { AppContext, AppContextType, ServiceOrder, ServiceOrderStatus } from '../src/types';
 import { Loader2, Wrench, Info, Check, ChevronDown, User, ArrowLeft } from 'lucide-react';
 import { ServiceOrderDetailsModal } from './ServiceOrderDetailsModal';
+import { CompleteOrderModal } from './CompleteOrderModal';
 
 const statusDisplayConfig: Record<ServiceOrderStatus, { bg: string; text: string; hover: string; ring: string; }> = {
     Pendiente: { bg: 'bg-amber-500', text: 'text-white', hover: 'hover:bg-amber-600', ring: 'focus:ring-amber-500' },
@@ -13,9 +14,9 @@ const statusDisplayConfig: Record<ServiceOrderStatus, { bg: string; text: string
     'No Agendado': { bg: 'bg-slate-500', text: 'text-white', hover: 'hover:bg-slate-600', ring: 'focus:ring-slate-500' },
 };
 
-const statusOrder: ServiceOrderStatus[] = ['Pendiente', 'En Proceso', 'Garantía']; // Technicians shouldn't cancel, and 'Completado' is now handled via modal.
+const statusOrder: ServiceOrderStatus[] = ['Pendiente', 'En Proceso', 'Garantía', 'Completado']; // Technicians can complete orders via modal
 
-const StatusDropdown: React.FC<{ orderId: string, currentStatus: ServiceOrderStatus }> = ({ orderId, currentStatus }) => {
+const StatusDropdown: React.FC<{ orderId: string, currentStatus: ServiceOrderStatus, onCompleteClick: () => void }> = ({ orderId, currentStatus, onCompleteClick }) => {
     const { updateServiceOrderStatus } = useContext(AppContext) as AppContextType;
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -32,8 +33,14 @@ const StatusDropdown: React.FC<{ orderId: string, currentStatus: ServiceOrderSta
     }, []);
 
     const handleSelect = (status: ServiceOrderStatus) => {
-        updateServiceOrderStatus(orderId, status);
-        setIsOpen(false);
+        if (status === 'Completado') {
+            // Open the complete modal instead of directly changing status
+            setIsOpen(false);
+            onCompleteClick();
+        } else {
+            updateServiceOrderStatus(orderId, status);
+            setIsOpen(false);
+        }
     };
 
     return (
@@ -75,6 +82,7 @@ const StatusDropdown: React.FC<{ orderId: string, currentStatus: ServiceOrderSta
 export const MyOrdersView: React.FC = () => {
     const { serviceOrders, currentUser, staff, setMode, goHome } = useContext(AppContext) as AppContextType;
     const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
+    const [orderToComplete, setOrderToComplete] = useState<ServiceOrder | null>(null);
     const myOrders = useMemo(() => {
         if (!currentUser || !currentUser.calendarId) return [];
         
@@ -137,7 +145,7 @@ export const MyOrdersView: React.FC = () => {
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2 self-start sm:self-center">
-                                        <StatusDropdown orderId={order.id} currentStatus={order.status} />
+                                        <StatusDropdown orderId={order.id} currentStatus={order.status} onCompleteClick={() => setOrderToComplete(order)} />
                                     </div>
                                 </div>
                                 <div className="mt-2 pt-2 border-t border-slate-200 space-y-2">
@@ -168,6 +176,13 @@ export const MyOrdersView: React.FC = () => {
                     onClose={() => setSelectedOrder(null)}
                     order={selectedOrder}
                 />
+                {orderToComplete && (
+                    <CompleteOrderModal
+                        isOpen={!!orderToComplete}
+                        onClose={() => setOrderToComplete(null)}
+                        order={orderToComplete}
+                    />
+                )}
             </div>
         </div>
     );
