@@ -1,26 +1,28 @@
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AppContext, AppContextType, Customer, Invoice, InvoiceLineItem, InvoiceStatus, ServiceOrder } from '../src/types';
-import { X, PlusCircle, Trash2, Pencil, Save, User } from 'lucide-react';
+import { X, PlusCircle, Trash2, Pencil, Save, User, UserPlus } from 'lucide-react';
 import { InvoiceItemModal } from './InvoiceItemModal';
 import { RecordPaymentModal } from './RecordPaymentModal';
+import { CustomerFormModal } from './CustomerFormModal';
 
 
 export const InvoiceFormModal: React.FC = () => {
-    const { 
-        customers, 
-        addInvoice, 
-        updateInvoice, 
-        orderToConvertToInvoice, 
-        staff, 
-        quoteToConvertToInvoice, 
-        invoiceMode, 
-        setMode, 
+    const {
+        customers,
+        addInvoice,
+        updateInvoice,
+        orderToConvertToInvoice,
+        staff,
+        quoteToConvertToInvoice,
+        invoiceMode,
+        setMode,
         invoiceToEdit,
         invoiceToDuplicate,
         setOrderToConvertToInvoice,
         setQuoteToConvertToInvoice,
         setInvoiceToEdit,
         setInvoiceToDuplicate,
+        addCustomer,
     } = useContext(AppContext) as AppContextType;
     
     const [customer, setCustomer] = useState<Customer | null>(null);
@@ -39,6 +41,7 @@ export const InvoiceFormModal: React.FC = () => {
     const [customerSearchQuery, setCustomerSearchQuery] = useState('');
     const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
     
     const onClose = () => {
         setMode('facturacion');
@@ -101,23 +104,33 @@ export const InvoiceFormModal: React.FC = () => {
     }, [invoiceToEdit, invoiceToDuplicate, orderToConvertToInvoice, quoteToConvertToInvoice, customers, resetForm]);
     
      useEffect(() => {
-        if (customerSearchQuery.trim() && !customer) {
-          const lowercasedQuery = customerSearchQuery.toLowerCase();
-          const filtered = customers.filter(c => 
-            c.name.toLowerCase().includes(lowercasedQuery) || 
-            c.phone.replace(/\D/g, '').includes(customerSearchQuery.replace(/\D/g, ''))
+        if (customerSearchQuery.trim()) {
+          const lowercasedQuery = customerSearchQuery.toLowerCase().trim();
+          const searchPhone = customerSearchQuery.replace(/\D/g, '');
+          const filtered = customers.filter(c =>
+            c.name.toLowerCase().includes(lowercasedQuery) ||
+            (searchPhone && c.phone.replace(/\D/g, '').includes(searchPhone))
           ).slice(0, 5);
           setCustomerSearchResults(filtered);
         } else {
           setCustomerSearchResults([]);
         }
-    }, [customerSearchQuery, customers, customer]);
+    }, [customerSearchQuery, customers]);
     
     const handleCustomerSelect = (selectedCustomer: Customer) => {
         setCustomer(selectedCustomer);
         setCustomerSearchQuery(selectedCustomer.name);
         setCustomerSearchResults([]);
         setIsSearchFocused(false);
+    };
+
+    const handleCreateCustomer = async (customerData: Omit<Customer, 'id' | 'serviceHistory'>) => {
+        const newCustomer = await addCustomer(customerData);
+        if (newCustomer) {
+            setCustomer(newCustomer);
+            setCustomerSearchQuery(newCustomer.name);
+        }
+        setIsCreatingCustomer(false);
     };
 
     const handleSaveItem = (item: InvoiceLineItem) => {
@@ -214,15 +227,43 @@ export const InvoiceFormModal: React.FC = () => {
                                     <input
                                         type="text"
                                         value={customerSearchQuery}
-                                        onChange={(e) => { setCustomerSearchQuery(e.target.value); setCustomer(null); }}
+                                        onChange={(e) => {
+                                            setCustomerSearchQuery(e.target.value);
+                                            setCustomer(null);
+                                            setIsSearchFocused(true);
+                                        }}
                                         onFocus={() => setIsSearchFocused(true)}
                                         onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                                         placeholder="Buscar cliente..."
                                         className="mt-1 input-style"
                                     />
-                                    {isSearchFocused && customerSearchResults.length > 0 && (
-                                        <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg">
-                                            {customerSearchResults.map(c => <button key={c.id} type="button" onMouseDown={() => handleCustomerSelect(c)} className="w-full text-left p-2 hover:bg-sky-100">{c.name}</button>)}
+                                    {isSearchFocused && customerSearchQuery.trim() && !customer && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                            {customerSearchResults.length > 0 ? (
+                                                customerSearchResults.map(c => (
+                                                    <button
+                                                        key={c.id}
+                                                        type="button"
+                                                        onMouseDown={() => handleCustomerSelect(c)}
+                                                        className="w-full text-left p-2 hover:bg-sky-100 border-b last:border-b-0"
+                                                    >
+                                                        <div className="font-medium">{c.name}</div>
+                                                        <div className="text-xs text-slate-500">{c.phone}</div>
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <div className="p-3">
+                                                    <p className="text-sm text-slate-500 mb-2">No se encontraron clientes con "{customerSearchQuery}"</p>
+                                                    <button
+                                                        type="button"
+                                                        onMouseDown={() => setIsCreatingCustomer(true)}
+                                                        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700"
+                                                    >
+                                                        <UserPlus size={16} />
+                                                        Crear Nuevo Cliente
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -351,7 +392,7 @@ export const InvoiceFormModal: React.FC = () => {
                 />
             )}
             {invoiceToPay && (
-                <RecordPaymentModal 
+                <RecordPaymentModal
                     isOpen={!!invoiceToPay}
                     onClose={() => {
                         setInvoiceToPay(null);
@@ -361,6 +402,11 @@ export const InvoiceFormModal: React.FC = () => {
                     initialAmount={paymentAmount ?? undefined}
                 />
             )}
+            <CustomerFormModal
+                isOpen={isCreatingCustomer}
+                onClose={() => setIsCreatingCustomer(false)}
+                onSave={handleCreateCustomer}
+            />
              <style>{`.input-style { color: #0f172a; display: block; width: 100%; padding: 0.5rem 0.75rem; background-color: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; box-shadow: sm; placeholder-slate-400; focus:outline-none focus:ring-sky-500 focus:border-sky-500; } .input-style:disabled, .input-style:read-only { background-color: #f1f5f9; cursor: not-allowed; } .label-style { display: block; font-weight: 500; font-size: 0.875rem; color: #334155; }`}</style>
         </>
     );

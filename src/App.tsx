@@ -347,16 +347,17 @@ const App: React.FC = () => {
     }
   };
 
-  const addCustomer = async (customerData: Omit<Customer, 'id' | 'serviceHistory' | 'createdById'>) => {
+  const addCustomer = async (customerData: Omit<Customer, 'id' | 'serviceHistory' | 'createdById'>): Promise<Customer | undefined> => {
     if (!syncedState || !localState) return;
     try {
-        const newCustomer: Customer = { 
-            ...customerData, 
-            id: `cust${Date.now()}`, 
+        const newCustomer: Customer = {
+            ...customerData,
+            id: `cust${Date.now()}`,
             serviceHistory: [],
             createdById: localState.currentUser?.id,
         };
         await firebaseService.saveState({ ...syncedState, customers: [...syncedState.customers, newCustomer] });
+        return newCustomer;
     } catch (e: any) {
         setGlobalError(getErrorMessage(e));
     }
