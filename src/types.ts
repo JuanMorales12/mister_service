@@ -309,7 +309,7 @@ export interface AppContextType extends AppState {
   addCalendar: (calendar: Omit<Calendar, 'id' | 'color'>) => Promise<void>;
   updateCalendar: (calendarId: string, calendarData: Partial<Omit<Calendar, 'id'>>) => Promise<void>;
   deleteCalendar: (calendarId: string) => Promise<void>;
-  addCustomer: (customerData: Omit<Customer, 'id' | 'serviceHistory' | 'createdById'>) => Promise<void>;
+  addCustomer: (customerData: Omit<Customer, 'id' | 'serviceHistory' | 'createdById'>) => Promise<Customer | undefined>;
   updateCustomer: (customerId: string, customerData: Omit<Customer, 'id' | 'serviceHistory' | 'createdById'>) => Promise<void>;
   loadCustomers: (customers: Customer[]) => Promise<void>;
   signInToGoogle: () => void;
