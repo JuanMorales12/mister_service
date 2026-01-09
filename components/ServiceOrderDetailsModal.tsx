@@ -1,7 +1,7 @@
 
 import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { AppContext, AppContextType, ServiceOrder, ServiceOrderStatus } from '../src/types';
-import { X, Edit, Phone, MapPin, Wrench, User, Calendar as CalendarIcon, Save, Info, Search, Clock, History, RefreshCw, Camera, CheckCircle } from 'lucide-react';
+import { X, Edit, Phone, MapPin, Wrench, User, Calendar as CalendarIcon, Save, Info, Search, Clock, History, RefreshCw, Camera, CheckCircle, Loader2 } from 'lucide-react';
 import { CompleteOrderModal } from './CompleteOrderModal';
 
 interface ServiceOrderDetailsModalProps {
@@ -24,6 +24,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   const { staff, calendars, updateServiceOrder, serviceOrders, currentUser } = useContext(AppContext) as AppContextType;
   const [isEditing, setIsEditing] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Editable fields state
   const [applianceType, setApplianceType] = useState('');
@@ -88,24 +89,29 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
     }
   }, [isEditing, calendarId, appointmentDate, calendars]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!order) return;
 
     if (isEditing) {
-        const start = new Date(`${appointmentDate}T${appointmentTime}`);
-        const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour duration
-        
-        updateServiceOrder(order.id, {
-            applianceType,
-            issueDescription,
-            serviceNotes,
-            start,
-            end,
-            calendarId,
-            status,
-            isCheckupOnly,
-            title: `${applianceType} - ${order.customerName}`
-        });
+        setIsSaving(true);
+        try {
+            const start = new Date(`${appointmentDate}T${appointmentTime}`);
+            const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour duration
+
+            await updateServiceOrder(order.id, {
+                applianceType,
+                issueDescription,
+                serviceNotes,
+                start,
+                end,
+                calendarId,
+                status,
+                isCheckupOnly,
+                title: `${applianceType} - ${order.customerName}`
+            });
+        } finally {
+            setIsSaving(false);
+        }
     }
     setIsEditing(false);
   };
@@ -266,8 +272,11 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
             <div className="flex gap-2">
                 {isEditing ? (
                     <>
-                        <button onClick={handleCancelEdit} className="px-4 py-2 text-sm font-medium rounded-md bg-slate-200 hover:bg-slate-300">Cancelar</button>
-                        <button onClick={handleSave} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-sky-600 hover:bg-sky-700 flex items-center gap-2"><Save size={16}/> Guardar</button>
+                        <button onClick={handleCancelEdit} className="px-4 py-2 text-sm font-medium rounded-md bg-slate-200 hover:bg-slate-300" disabled={isSaving}>Cancelar</button>
+                        <button onClick={handleSave} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-sky-600 hover:bg-sky-700 flex items-center gap-2" disabled={isSaving}>
+                            {isSaving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
+                            {isSaving ? 'Guardando...' : 'Guardar'}
+                        </button>
                     </>
                 ) : (
                     <>

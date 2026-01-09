@@ -21,6 +21,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
   const [longitude, setLongitude] = useState<number | undefined>();
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const isEditMode = !!customerToEdit;
 
@@ -96,13 +97,18 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
   };
 
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !phone || !address) {
         alert("Por favor, completa los campos de nombre, teléfono y dirección.");
         return;
     }
-    onSave({ name, phone, email, address, latitude, longitude });
+    setIsSaving(true);
+    try {
+        await onSave({ name, phone, email, address, latitude, longitude });
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -143,11 +149,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
           </div>
           
           <div className="flex justify-end gap-4 pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200">
+            <button type="button" onClick={onClose} disabled={isSaving} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed">
               Cancelar
             </button>
-            <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700">
-              {isEditMode ? 'Guardar Cambios' : 'Guardar Cliente'}
+            <button type="submit" disabled={isSaving} className="px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+              {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSaving ? 'Guardando...' : (isEditMode ? 'Guardar Cambios' : 'Guardar Cliente')}
             </button>
           </div>
         </form>

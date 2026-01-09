@@ -301,6 +301,14 @@ const App: React.FC = () => {
     }
   };
 
+  const changeStaffPassword = async (email: string, currentPassword: string, newPassword: string) => {
+    try {
+        await firebaseService.changeStaffPassword(email, currentPassword, newPassword);
+    } catch (e: any) {
+        throw new Error(getErrorMessage(e));
+    }
+  };
+
   const addCalendar = async (calendarData: Omit<Calendar, 'id' | 'color'>) => {
     if (!syncedState) return;
     try {
@@ -1269,6 +1277,7 @@ const appContextValue: AppContextType | null = appState ? {
   updateStaff,
   deleteStaff,
   updateStaffRole,
+  changeStaffPassword,
   addCalendar,
   updateCalendar,
   deleteCalendar,

@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AppContext, AppContextType, Customer, Invoice, InvoiceLineItem, InvoiceStatus, ServiceOrder } from '../src/types';
-import { X, PlusCircle, Trash2, Pencil, Save, User, UserPlus } from 'lucide-react';
+import { X, PlusCircle, Trash2, Pencil, Save, User, UserPlus, CheckCircle, Loader2 } from 'lucide-react';
 import { InvoiceItemModal } from './InvoiceItemModal';
 import { RecordPaymentModal } from './RecordPaymentModal';
 import { CustomerFormModal } from './CustomerFormModal';
@@ -23,6 +23,7 @@ export const InvoiceFormModal: React.FC = () => {
         setInvoiceToEdit,
         setInvoiceToDuplicate,
         addCustomer,
+        updateCustomer,
     } = useContext(AppContext) as AppContextType;
     
     const [customer, setCustomer] = useState<Customer | null>(null);
@@ -42,6 +43,9 @@ export const InvoiceFormModal: React.FC = () => {
     const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+    const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+    const [customerSuccess, setCustomerSuccess] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
     
     const onClose = () => {
         setMode('facturacion');
@@ -129,8 +133,22 @@ export const InvoiceFormModal: React.FC = () => {
         if (newCustomer) {
             setCustomer(newCustomer);
             setCustomerSearchQuery(newCustomer.name);
+            setCustomerSuccess('Cliente creado exitosamente.');
+            setTimeout(() => setCustomerSuccess(null), 3000);
         }
         setIsCreatingCustomer(false);
+    };
+
+    const handleEditCustomer = async (customerData: Omit<Customer, 'id' | 'serviceHistory'>) => {
+        if (customer) {
+            await updateCustomer(customer.id, customerData);
+            const updatedCustomer = { ...customer, ...customerData };
+            setCustomer(updatedCustomer);
+            setCustomerSearchQuery(updatedCustomer.name);
+            setCustomerSuccess('Cliente actualizado exitosamente.');
+            setTimeout(() => setCustomerSuccess(null), 3000);
+        }
+        setIsEditingCustomer(false);
     };
 
     const handleSaveItem = (item: InvoiceLineItem) => {
@@ -170,43 +188,48 @@ export const InvoiceFormModal: React.FC = () => {
             return;
         }
 
-        const invoiceData = { 
-            customerId: customer.id, 
-            date, 
-            items, 
-            discount, 
-            isTaxable,
-            status: 'Emitida' as InvoiceStatus,
-            serviceOrderId: (invoiceToEdit || invoiceToDuplicate) ? undefined : orderToConvertToInvoice?.id,
-            serviceOrderDescription
-        };
-        
-        let savedInvoiceId: string;
-        if (invoiceToEdit) {
-            await updateInvoice(invoiceToEdit.id, invoiceData);
-            savedInvoiceId = invoiceToEdit.id;
-        } else {
-            savedInvoiceId = await addInvoice(invoiceData);
-        }
+        setIsSaving(true);
+        try {
+            const invoiceData = {
+                customerId: customer.id,
+                date,
+                items,
+                discount,
+                isTaxable,
+                status: 'Emitida' as InvoiceStatus,
+                serviceOrderId: (invoiceToEdit || invoiceToDuplicate) ? undefined : orderToConvertToInvoice?.id,
+                serviceOrderDescription
+            };
 
-        const finalInvoice: Invoice = {
-            ...invoiceData,
-            id: savedInvoiceId,
-            invoiceNumber: '', // Placeholder
-            subtotal,
-            taxes,
-            total,
-            payments: invoiceToEdit ? invoiceToEdit.payments : [],
-            paidAmount: invoiceToEdit ? invoiceToEdit.paidAmount : 0,
-        };
-        
-        if (invoiceMode === 'advance') {
-            setPaymentAmount(total * 0.5);
-        } else {
-            setPaymentAmount(total);
-        }
+            let savedInvoiceId: string;
+            if (invoiceToEdit) {
+                await updateInvoice(invoiceToEdit.id, invoiceData);
+                savedInvoiceId = invoiceToEdit.id;
+            } else {
+                savedInvoiceId = await addInvoice(invoiceData);
+            }
 
-        setInvoiceToPay(finalInvoice);
+            const finalInvoice: Invoice = {
+                ...invoiceData,
+                id: savedInvoiceId,
+                invoiceNumber: '', // Placeholder
+                subtotal,
+                taxes,
+                total,
+                payments: invoiceToEdit ? invoiceToEdit.payments : [],
+                paidAmount: invoiceToEdit ? invoiceToEdit.paidAmount : 0,
+            };
+
+            if (invoiceMode === 'advance') {
+                setPaymentAmount(total * 0.5);
+            } else {
+                setPaymentAmount(total);
+            }
+
+            setInvoiceToPay(finalInvoice);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -222,6 +245,12 @@ export const InvoiceFormModal: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                             <div className="md:col-span-3 space-y-4">
                                 <h3 className="text-lg font-semibold text-slate-600 border-b pb-2">Información del Cliente</h3>
+                                {customerSuccess && (
+                                    <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 rounded-md flex items-center gap-2" role="alert">
+                                        <CheckCircle className="h-4 w-4"/>
+                                        <p className="text-sm font-medium">{customerSuccess}</p>
+                                    </div>
+                                )}
                                 <div className="relative">
                                     <label className="label-style">Cliente</label>
                                     <input
@@ -269,7 +298,17 @@ export const InvoiceFormModal: React.FC = () => {
                                 </div>
                                 {customer && (
                                     <div className="p-3 bg-slate-50 border rounded-md text-sm text-slate-600">
-                                        <p className="font-semibold text-slate-800 flex items-center gap-2"><User size={14}/> {customer.name}</p>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <p className="font-semibold text-slate-800 flex items-center gap-2"><User size={14}/> {customer.name}</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsEditingCustomer(true)}
+                                                className="text-sky-600 hover:text-sky-800 flex items-center gap-1 text-xs"
+                                            >
+                                                <Pencil size={12} />
+                                                Editar
+                                            </button>
+                                        </div>
                                         <p><strong>Tel:</strong> {customer.phone}</p>
                                         <p><strong>Dir:</strong> {customer.address}</p>
                                     </div>
@@ -358,9 +397,10 @@ export const InvoiceFormModal: React.FC = () => {
                     
                     <footer className="flex flex-col md:flex-row justify-between items-start gap-6 pt-6 mt-6 border-t">
                         <div className="w-full md:w-auto flex flex-col sm:flex-row justify-end gap-4">
-                            <button type="button" onClick={onClose} className="px-5 py-2 text-sm font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300">Salir</button>
-                            <button type="submit" className="px-5 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700 flex items-center justify-center gap-2">
-                                <Save size={16}/> Finalizar y Pagar
+                            <button type="button" onClick={onClose} disabled={isSaving} className="px-5 py-2 text-sm font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed">Salir</button>
+                            <button type="submit" disabled={isSaving} className="px-5 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                {isSaving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
+                                {isSaving ? 'Guardando...' : 'Finalizar y Pagar'}
                             </button>
                         </div>
                         <div className="w-full md:w-auto md:flex-grow flex justify-end">
@@ -403,9 +443,13 @@ export const InvoiceFormModal: React.FC = () => {
                 />
             )}
             <CustomerFormModal
-                isOpen={isCreatingCustomer}
-                onClose={() => setIsCreatingCustomer(false)}
-                onSave={handleCreateCustomer}
+                isOpen={isCreatingCustomer || isEditingCustomer}
+                onClose={() => {
+                    setIsCreatingCustomer(false);
+                    setIsEditingCustomer(false);
+                }}
+                onSave={isEditingCustomer ? handleEditCustomer : handleCreateCustomer}
+                customerToEdit={isEditingCustomer ? customer : null}
             />
              <style>{`.input-style { color: #0f172a; display: block; width: 100%; padding: 0.5rem 0.75rem; background-color: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; box-shadow: sm; placeholder-slate-400; focus:outline-none focus:ring-sky-500 focus:border-sky-500; } .input-style:disabled, .input-style:read-only { background-color: #f1f5f9; cursor: not-allowed; } .label-style { display: block; font-weight: 500; font-size: 0.875rem; color: #334155; }`}</style>
         </>

@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { AppContext, AppContextType, Staff, StaffRole } from '../src/types';
-import { X, Save, Camera, AlertCircle } from 'lucide-react';
+import { X, Save, Camera, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 
 interface EmployeeDetailsModalProps {
   isOpen: boolean;
@@ -119,11 +119,17 @@ const PhotoUpload: React.FC<{
 // --- Main Component ---
 
 export const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({ isOpen, onClose, staffMember, mode }) => {
-  const { addStaff, updateStaff } = useContext(AppContext) as AppContextType;
+  const { addStaff, updateStaff, currentUser, changeStaffPassword } = useContext(AppContext) as AppContextType;
   const [formState, setFormState] = useState(initialFormState);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const isReadOnly = mode === 'view';
   const isCreateMode = mode === 'create';
@@ -140,7 +146,12 @@ export const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({ isOp
       }
       setPassword('');
       setConfirmPassword('');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setShowPasswordChange(false);
       setError(null);
+      setSuccess(null);
     }
   }, [isOpen, staffMember, mode]);
 
@@ -169,30 +180,61 @@ export const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({ isOp
     e.preventDefault();
     if (isReadOnly) return;
     setError(null);
-    
-    if (mode === 'create') {
-        if (!formState.email || !password) {
-            setError("El correo y la contraseña son obligatorios para crear un usuario.");
-            return;
+    setSuccess(null);
+    setIsSaving(true);
+
+    try {
+        if (mode === 'create') {
+            if (!formState.email || !password) {
+                setError("El correo y la contraseña son obligatorios para crear un usuario.");
+                return;
+            }
+            if (password.length < 6) {
+                setError("La contraseña debe tener al menos 6 caracteres.");
+                return;
+            }
+            if (password !== confirmPassword) {
+                setError("Las contraseñas no coinciden.");
+                return;
+            }
+            try {
+                await addStaff(formState, password);
+                setSuccess("Empleado creado exitosamente.");
+                setTimeout(() => onClose(), 1500);
+            } catch (err: any) {
+                setError(err.message);
+            }
+        } else if (mode === 'edit' && staffMember) {
+            // Si se está cambiando la contraseña
+            if (showPasswordChange && newPassword) {
+                if (!currentPassword) {
+                    setError("Debes ingresar la contraseña actual del empleado.");
+                    return;
+                }
+                if (newPassword.length < 6) {
+                    setError("La nueva contraseña debe tener al menos 6 caracteres.");
+                    return;
+                }
+                if (newPassword !== confirmNewPassword) {
+                    setError("Las nuevas contraseñas no coinciden.");
+                    return;
+                }
+                try {
+                    await changeStaffPassword(formState.email, currentPassword, newPassword);
+                } catch (err: any) {
+                    setError("Error al cambiar la contraseña: " + err.message);
+                    return;
+                }
+            }
+
+            // Actualizar los datos del empleado
+            const { email, ...updatableData } = formState; // Email cannot be updated
+            await updateStaff(staffMember.id, updatableData);
+            setSuccess(showPasswordChange && newPassword ? "Empleado actualizado y contraseña cambiada exitosamente." : "Empleado actualizado exitosamente.");
+            setTimeout(() => onClose(), 1500);
         }
-        if (password.length < 6) {
-            setError("La contraseña debe tener al menos 6 caracteres.");
-            return;
-        }
-        if (password !== confirmPassword) {
-            setError("Las contraseñas no coinciden.");
-            return;
-        }
-        try {
-            await addStaff(formState, password);
-            onClose();
-        } catch (err: any) {
-            setError(err.message);
-        }
-    } else if (mode === 'edit' && staffMember) {
-        const { email, ...updatableData } = formState; // Email cannot be updated
-        await updateStaff(staffMember.id, updatableData);
-        onClose();
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -218,8 +260,17 @@ export const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({ isOp
                     <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-md flex items-center gap-3" role="alert">
                         <AlertCircle className="h-5 w-5"/>
                         <div>
-                            <p className="font-bold">Error al crear empleado</p>
+                            <p className="font-bold">Error</p>
                             <p className="text-sm">{error}</p>
+                        </div>
+                    </div>
+                )}
+                {success && (
+                    <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 rounded-md flex items-center gap-3" role="alert">
+                        <CheckCircle className="h-5 w-5"/>
+                        <div>
+                            <p className="font-bold">Éxito</p>
+                            <p className="text-sm">{success}</p>
                         </div>
                     </div>
                 )}
@@ -244,6 +295,54 @@ export const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({ isOp
                                             <input type="password" id="confirmPassword" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required className="input-style"/>
                                         </div>
                                     </>
+                                )}
+                                {mode === 'edit' && currentUser?.role === 'administrador' && !isReadOnly && (
+                                    <div className="md:col-span-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPasswordChange(!showPasswordChange)}
+                                            className="text-sm text-sky-600 hover:text-sky-800 font-medium"
+                                        >
+                                            {showPasswordChange ? '✕ Cancelar cambio de contraseña' : '🔑 Cambiar contraseña'}
+                                        </button>
+                                        {showPasswordChange && (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                                                <div>
+                                                    <label htmlFor="currentPassword" className="block text-xs font-medium text-slate-600 mb-1">Contraseña Actual</label>
+                                                    <input
+                                                        type="password"
+                                                        id="currentPassword"
+                                                        value={currentPassword}
+                                                        onChange={e => setCurrentPassword(e.target.value)}
+                                                        className="input-style"
+                                                        placeholder="Contraseña actual del empleado"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label htmlFor="newPassword" className="block text-xs font-medium text-slate-600 mb-1">Nueva Contraseña</label>
+                                                    <input
+                                                        type="password"
+                                                        id="newPassword"
+                                                        value={newPassword}
+                                                        onChange={e => setNewPassword(e.target.value)}
+                                                        className="input-style"
+                                                        placeholder="Mínimo 6 caracteres"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label htmlFor="confirmNewPassword" className="block text-xs font-medium text-slate-600 mb-1">Confirmar Nueva Contraseña</label>
+                                                    <input
+                                                        type="password"
+                                                        id="confirmNewPassword"
+                                                        value={confirmNewPassword}
+                                                        onChange={e => setConfirmNewPassword(e.target.value)}
+                                                        className="input-style"
+                                                        placeholder="Repetir nueva contraseña"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -304,12 +403,13 @@ export const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({ isOp
             </main>
             
             <footer className="flex justify-end gap-4 p-4 border-t bg-slate-50">
-                <button type="button" onClick={onClose} className="px-5 py-2 text-sm font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300">
+                <button type="button" onClick={onClose} disabled={isSaving} className="px-5 py-2 text-sm font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed">
                     {isReadOnly ? 'Cerrar' : 'Cancelar'}
                 </button>
                 {!isReadOnly && (
-                    <button type="submit" className="px-5 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700 flex items-center gap-2">
-                        <Save size={16}/> {mode === 'create' ? 'Crear Empleado' : 'Guardar Cambios'}
+                    <button type="submit" disabled={isSaving} className="px-5 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                        {isSaving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
+                        {isSaving ? 'Guardando...' : (mode === 'create' ? 'Crear Empleado' : 'Guardar Cambios')}
                     </button>
                 )}
             </footer>

@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { AppContext, AppContextType } from '../src/types';
 import { Printer, Share2, X } from 'lucide-react';
+import logo from '../assets/logo.jpg';
 
 export const InvoicePrintView: React.FC = () => {
     const { invoiceToPrint, setInvoiceToPrint, companyInfo, setGlobalError } = useContext(AppContext) as AppContextType;
@@ -59,7 +60,8 @@ export const InvoicePrintView: React.FC = () => {
                             <p>{companyInfo.email}</p>
                         </div>
                     </div>
-                     <div className="text-right">
+                     <div className="text-right flex flex-col items-end">
+                        <img src={logo} alt="Logo" className="h-40 w-40 object-contain mb-3" />
                         <h2 className="text-4xl font-bold text-sky-600">FACTURA</h2>
                         <p className="mt-2"><b>Fecha:</b> {new Date(invoice.date).toLocaleDateString('es-ES')}</p>
                     </div>
