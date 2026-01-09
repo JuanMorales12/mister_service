@@ -306,6 +306,7 @@ export interface AppContextType extends AppState {
   updateStaff: (staffId: string, staffData: Omit<Staff, 'id' | 'calendarId' | 'email'>) => Promise<void>;
   deleteStaff: (staffId: string) => Promise<void>;
   updateStaffRole: (staffId: string, role: StaffRole) => Promise<void>;
+  changeStaffPassword: (email: string, currentPassword: string, newPassword: string) => Promise<void>;
   addCalendar: (calendar: Omit<Calendar, 'id' | 'color'>) => Promise<void>;
   updateCalendar: (calendarId: string, calendarData: Partial<Omit<Calendar, 'id'>>) => Promise<void>;
   deleteCalendar: (calendarId: string) => Promise<void>;

@@ -14,6 +14,7 @@ import {
     signInWithEmailAndPassword,
     signOut,
     createUserWithEmailAndPassword,
+    updatePassword,
     User
 } from "firebase/auth";
 import { SyncedAppState, Customer, ServiceOrder, Staff } from "../types";
@@ -104,6 +105,15 @@ export const firebaseService = {
     createStaffUser: async (email: string, pass: string) => {
         // Use the separate auth instance for creating users
         return createUserWithEmailAndPassword(adminAuth, email, pass);
+    },
+
+    changeStaffPassword: async (email: string, currentPassword: string, newPassword: string) => {
+        // Sign in with admin auth using current password to get the user
+        const userCredential = await signInWithEmailAndPassword(adminAuth, email, currentPassword);
+        // Update the password
+        await updatePassword(userCredential.user, newPassword);
+        // Sign out from admin auth
+        await signOut(adminAuth);
     },
 
     bootstrapAdminAndData: async (email: string, pass: string, initialState: SyncedAppState) => {
