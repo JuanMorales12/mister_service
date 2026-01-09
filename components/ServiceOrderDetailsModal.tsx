@@ -3,6 +3,7 @@ import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { AppContext, AppContextType, ServiceOrder, ServiceOrderStatus } from '../src/types';
 import { X, Edit, Phone, MapPin, Wrench, User, Calendar as CalendarIcon, Save, Info, Search, Clock, History, RefreshCw, Camera, CheckCircle, Loader2 } from 'lucide-react';
 import { CompleteOrderModal } from './CompleteOrderModal';
+import { AddressAutocompleteInput } from './AddressAutocompleteInput';
 
 interface ServiceOrderDetailsModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   const [isEditing, setIsEditing] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [addressInputKey, setAddressInputKey] = useState(0);
 
   // Editable fields state
   const [applianceType, setApplianceType] = useState('');
@@ -35,6 +37,9 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   const [calendarId, setCalendarId] = useState('');
   const [status, setStatus] = useState<ServiceOrderStatus>('Pendiente');
   const [isCheckupOnly, setIsCheckupOnly] = useState(false);
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [latitude, setLatitude] = useState<number | undefined>();
+  const [longitude, setLongitude] = useState<number | undefined>();
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   
   const technician = useMemo(() => staff.find(s => s.calendarId === order?.calendarId), [staff, order]);
@@ -48,6 +53,9 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
       setCalendarId(order.calendarId || '');
       setStatus(order.status);
       setIsCheckupOnly(order.isCheckupOnly || false);
+      setCustomerAddress(order.customerAddress || '');
+      setLatitude(order.latitude);
+      setLongitude(order.longitude);
       if (order.start) {
         const d = new Date(order.start);
         setAppointmentDate(d.toISOString().split('T')[0]);
@@ -98,7 +106,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
             const start = new Date(`${appointmentDate}T${appointmentTime}`);
             const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour duration
 
-            await updateServiceOrder(order.id, {
+            const updateData: any = {
                 applianceType,
                 issueDescription,
                 serviceNotes,
@@ -107,8 +115,14 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                 calendarId,
                 status,
                 isCheckupOnly,
+                customerAddress,
                 title: `${applianceType} - ${order.customerName}`
-            });
+            };
+
+            if (latitude !== undefined) updateData.latitude = latitude;
+            if (longitude !== undefined) updateData.longitude = longitude;
+
+            await updateServiceOrder(order.id, updateData);
         } finally {
             setIsSaving(false);
         }
@@ -124,6 +138,9 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
         setCalendarId(order.calendarId || '');
         setStatus(order.status);
         setIsCheckupOnly(order.isCheckupOnly || false);
+        setCustomerAddress(order.customerAddress || '');
+        setLatitude(order.latitude);
+        setLongitude(order.longitude);
         if (order.start) {
             const d = new Date(order.start);
             setAppointmentDate(d.toISOString().split('T')[0]);
@@ -167,7 +184,23 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                 <p className="font-bold text-slate-800">{order.customerName}</p>
                 <div className="text-sm text-slate-600 mt-1 space-y-1">
                   <p className="flex items-center gap-2"><Phone size={14}/> {order.customerPhone}</p>
-                  <p className="flex items-start gap-2"><MapPin size={14} className="mt-0.5"/> {order.customerAddress}</p>
+                  {isEditing ? (
+                    <div className="mt-2">
+                      <label className="label-style flex items-center gap-2 mb-1"><MapPin size={14}/> Dirección</label>
+                      <AddressAutocompleteInput
+                        key={`address-${order.id}-${addressInputKey}`}
+                        value={customerAddress}
+                        onChange={setCustomerAddress}
+                        onPlaceSelected={(details) => {
+                          setCustomerAddress(details.address);
+                          setLatitude(details.latitude);
+                          setLongitude(details.longitude);
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <p className="flex items-start gap-2"><MapPin size={14} className="mt-0.5"/> {order.customerAddress}</p>
+                  )}
                 </div>
               </div>
             </section>
@@ -280,7 +313,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                     </>
                 ) : (
                     <>
-                        {canEdit && <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium rounded-md bg-slate-200 hover:bg-slate-300 flex items-center gap-2"><Edit size={16}/> Editar</button>}
+                        {canEdit && <button onClick={() => { setIsEditing(true); setAddressInputKey(prev => prev + 1); }} className="px-4 py-2 text-sm font-medium rounded-md bg-slate-200 hover:bg-slate-300 flex items-center gap-2"><Edit size={16}/> Editar</button>}
                         {canComplete && <button onClick={() => setIsCompleteModalOpen(true)} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-green-600 hover:bg-green-700 flex items-center gap-2"><CheckCircle size={16}/> Completar</button>}
                     </>
                 )}
@@ -289,7 +322,12 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
         </div>
       </div>
       {isCompleteModalOpen && <CompleteOrderModal isOpen={isCompleteModalOpen} onClose={() => { setIsCompleteModalOpen(false); onClose(); }} order={order} />}
-      <style>{`.input-style { display: block; width: 100%; padding: 0.5rem 0.75rem; background-color: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; } .input-style:read-only { background-color: #f1f5f9; cursor: not-allowed; } .label-style { display: block; text-sm font-medium text-slate-500; }`}</style>
+      <style>{`
+        .input-style { display: block; width: 100%; padding: 0.5rem 0.75rem; background-color: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; }
+        .input-style:read-only { background-color: #f1f5f9; cursor: not-allowed; }
+        .label-style { display: block; text-sm font-medium text-slate-500; }
+        .pac-container { z-index: 10000 !important; }
+      `}</style>
     </>
   );
 };
