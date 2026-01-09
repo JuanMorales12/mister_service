@@ -13,6 +13,15 @@ export const InvoicePrintView: React.FC = () => {
 
     const handlePrint = () => {
         window.print();
+        // Detectar cuando se cierra el diálogo de impresión
+        const afterPrint = () => {
+            const shouldClose = window.confirm('¿Deseas cerrar la vista de impresión?');
+            if (shouldClose) {
+                setInvoiceToPrint(null);
+            }
+            window.removeEventListener('afterprint', afterPrint);
+        };
+        window.addEventListener('afterprint', afterPrint);
     };
     
     const handleShare = async () => {
@@ -34,8 +43,8 @@ export const InvoicePrintView: React.FC = () => {
     };
 
     return (
-        <div className="print-container">
-            <div className="fixed top-4 right-4 flex flex-col gap-2 no-print z-50">
+        <div className="fixed inset-0 z-[9999] print-container">
+            <div className="fixed top-4 right-4 flex flex-col gap-2 no-print z-[10000]">
                  <button onClick={() => setInvoiceToPrint(null)} className="p-3 bg-white rounded-full shadow-lg text-slate-700 hover:bg-slate-100">
                     <X size={20}/>
                 </button>
@@ -143,6 +152,7 @@ export const InvoicePrintView: React.FC = () => {
                 .print-container {
                     background-color: #e2e8f0;
                     padding: 0.5rem;
+                    overflow-y: auto;
                 }
                 @media (min-width: 768px) {
                     .print-container {
