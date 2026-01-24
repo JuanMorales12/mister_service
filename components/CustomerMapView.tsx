@@ -13,6 +13,25 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+// Icono gris para citas de otros técnicos cuando se filtra
+const grayIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const defaultIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
 
 interface ScheduledCustomer {
     orderId: string;
@@ -30,10 +49,16 @@ interface ScheduledCustomer {
 export const CustomerMapView: React.FC = () => {
     const { customers, serviceOrders, calendars, staff, goHome } = useContext(AppContext) as AppContextType;
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('all');
     const [orderToEdit, setOrderToEdit] = useState<ServiceOrder | null>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<L.Map | null>(null);
     const routeLayersRef = useRef<L.Polyline[]>([]);
+
+    // Lista de técnicos para el filtro
+    const technicians = useMemo(() => {
+        return staff.filter(s => s.role === 'tecnico');
+    }, [staff]);
     
     const scheduledCustomers = useMemo((): ScheduledCustomer[] => {
         const startOfDay = new Date(`${selectedDate}T00:00:00`);
@@ -170,16 +195,23 @@ export const CustomerMapView: React.FC = () => {
             scheduledCustomers.forEach(customer => {
                 const point: L.LatLngExpression = [customer.lat, customer.lng];
                 points.push(point);
-                
+
                 if (customer.calendarId) {
                     if (!routesByTechnician[customer.calendarId]) {
                         routesByTechnician[customer.calendarId] = [];
                     }
                     routesByTechnician[customer.calendarId].push(point);
                 }
-                
+
                 const technician = staff.find(s => s.calendarId === customer.calendarId);
                 const creator = staff.find(s => s.id === customer.createdById);
+
+                // Determinar si esta cita pertenece al técnico filtrado
+                const selectedTechCalendar = selectedTechnicianId !== 'all'
+                    ? calendars.find(c => c.userId === selectedTechnicianId)
+                    : null;
+                const isFilteredTechnician = selectedTechnicianId === 'all' || customer.calendarId === selectedTechCalendar?.id;
+                const markerIcon = isFilteredTechnician ? defaultIcon : grayIcon;
 
                 const popupContent = `
                     <div style="font-family: sans-serif; font-size: 14px; min-width: 240px;">
@@ -198,7 +230,7 @@ export const CustomerMapView: React.FC = () => {
                     </style>
                 `;
 
-                const marker = L.marker(point)
+                const marker = L.marker(point, { icon: markerIcon })
                     .addTo(map)
                     .bindPopup(popupContent);
 
@@ -231,7 +263,7 @@ export const CustomerMapView: React.FC = () => {
         } else {
             map.setView([18.7357, -70.1627], 8);
         }
-    }, [scheduledCustomers, serviceOrders, calendars, staff]);
+    }, [scheduledCustomers, serviceOrders, calendars, staff, selectedTechnicianId]);
 
     return (
         <>
@@ -244,18 +276,42 @@ export const CustomerMapView: React.FC = () => {
                     <h2 className="text-2xl font-bold text-slate-700 flex items-center gap-2">
                         <Map className="text-sky-600" /> Distribución de Citas Diarias
                     </h2>
-                    <div className="flex items-center gap-2 p-2 bg-slate-100 rounded-md">
-                        <label htmlFor="map-date-picker" className="text-sm font-medium text-slate-600 flex items-center gap-1">
-                            <Calendar size={16}/>
-                            Fecha de Citas:
-                        </label>
-                        <input
-                            type="date"
-                            id="map-date-picker"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="p-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
-                        />
+                    <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex items-center gap-2 p-2 bg-slate-100 rounded-md">
+                            <label htmlFor="map-date-picker" className="text-sm font-medium text-slate-600 flex items-center gap-1">
+                                <Calendar size={16}/>
+                                Fecha:
+                            </label>
+                            <input
+                                type="date"
+                                id="map-date-picker"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="p-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 p-2 bg-slate-100 rounded-md">
+                            <label htmlFor="technician-filter" className="text-sm font-medium text-slate-600">
+                                Técnico:
+                            </label>
+                            <select
+                                id="technician-filter"
+                                value={selectedTechnicianId}
+                                onChange={(e) => setSelectedTechnicianId(e.target.value)}
+                                className="p-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
+                            >
+                                <option value="all">Todos los técnicos</option>
+                                {technicians.map(tech => (
+                                    <option key={tech.id} value={tech.id}>{tech.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {selectedTechnicianId !== 'all' && (
+                            <div className="text-xs text-slate-500 flex items-center gap-2">
+                                <span className="inline-block w-3 h-3 bg-gray-400 rounded-full"></span>
+                                Citas de otros técnicos en gris
+                            </div>
+                        )}
                     </div>
                 </div>
                 <div className="relative w-full h-[70vh] bg-slate-200">

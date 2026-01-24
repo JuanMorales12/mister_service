@@ -51,7 +51,8 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
         if (
             order.calendarId === calendarId &&
             order.start &&
-            order.status !== 'Cancelado'
+            order.status !== 'Cancelado' &&
+            order.status !== 'No Agendado'
         ) {
             const orderDate = new Date(order.start);
             if (orderDate >= selectedDayStart && orderDate <= selectedDayEnd) {
@@ -128,7 +129,28 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
       const dayOfWeek = checkDate.getUTCDay();
 
       const dayAvailability = selectedCalendar?.availability?.find(d => d.dayOfWeek === dayOfWeek);
-      setAvailableTimeSlots(dayAvailability?.slots.map(slot => slot.startTime).sort() || []);
+
+      // Generar horas disponibles de 9:00 a 18:00 (cada hora) dentro de los slots configurados
+      const slots = dayAvailability?.slots || [];
+      const hourlySlots: string[] = [];
+
+      // Horas de operación: 9:00 a 18:00
+      for (let hour = 9; hour <= 18; hour++) {
+        const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+
+        // Verificar si esta hora está dentro de algún slot configurado
+        const isWithinSlot = slots.some(slot => {
+          const [startHour] = slot.startTime.split(':').map(Number);
+          const [endHour] = slot.endTime.split(':').map(Number);
+          return hour >= startHour && hour <= endHour;
+        });
+
+        if (isWithinSlot) {
+          hourlySlots.push(timeStr);
+        }
+      }
+
+      setAvailableTimeSlots(hourlySlots);
       setAppointmentTime('');
     } else {
       setAvailableTimeSlots([]);

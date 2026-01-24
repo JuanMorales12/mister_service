@@ -105,13 +105,27 @@ export const ConfirmAppointmentModal: React.FC<ConfirmAppointmentModalProps> = (
       const dayOfWeek = checkDate.getUTCDay();
 
       const dayAvailability = selectedCalendar?.availability?.find(d => d.dayOfWeek === dayOfWeek);
+      const slots = dayAvailability?.slots || [];
 
-      if (dayAvailability?.slots.length) {
-        const slots = dayAvailability.slots.map(slot => slot.startTime).sort();
-        setAvailableTimeSlots(slots);
-      } else {
-        setAvailableTimeSlots([]);
+      // Generar horas disponibles de 9:00 a 18:00 (cada hora) dentro de los slots configurados
+      const hourlySlots: string[] = [];
+
+      for (let hour = 9; hour <= 18; hour++) {
+        const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+
+        // Verificar si esta hora está dentro de algún slot configurado
+        const isWithinSlot = slots.some(slot => {
+          const [startHour] = slot.startTime.split(':').map(Number);
+          const [endHour] = slot.endTime.split(':').map(Number);
+          return hour >= startHour && hour <= endHour;
+        });
+
+        if (isWithinSlot) {
+          hourlySlots.push(timeStr);
+        }
       }
+
+      setAvailableTimeSlots(hourlySlots);
       setAppointmentTime(''); // Reset time
     } else {
       setAvailableTimeSlots([]);

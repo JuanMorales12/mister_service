@@ -13,6 +13,7 @@ export interface Customer {
   phone: string;
   email: string;
   address: string;
+  rnc?: string; // RNC para persona jurídica
   latitude?: number;
   longitude?: number;
   serviceHistory: string[]; // Array of ServiceOrder IDs
@@ -20,6 +21,8 @@ export interface Customer {
 }
 
 export type StaffRole = 'administrador' | 'coordinador' | 'tecnico' | 'secretaria';
+
+export type CalendarViewType = 'day' | 'week' | 'month';
 
 export interface Staff {
   id: string;
@@ -31,30 +34,19 @@ export interface Staff {
   fleetPhone?: string;
   idNumber?: string;
   accessKey?: string;
-  
-  // New detailed fields
+
+  // Campos detallados
   code?: string;
   address?: string;
   salary?: number;
   startDate?: string; // "YYYY-MM-DD"
   tss?: number;
   afp?: number;
-  loans?: number;
-  workErrorDeduction?: number;
-  otherDeductions?: number;
-  discount?: number;
-  requiredHours?: number;
-  workedHours?: number;
-  overtimeValue?: number;
-  totalHoursValue?: number;
-  income?: number;
-  commission?: number;
-  isPayrollTaxable?: 'Si' | 'No';
-  commissionBase?: string;
-  tssDeductionSchedule?: string;
-  afpDeductionSchedule?: string;
-  idPhotoUrl?: string; // Data URL for the image
-  employeePhotoUrl?: string; // Data URL for the image
+  idPhotoUrl?: string;
+  employeePhotoUrl?: string;
+
+  // Configuración de vistas del calendario (solo técnicos)
+  allowedCalendarViews?: CalendarViewType[]; // Si no se define, solo 'day' por defecto
 }
 
 export interface TimeSlot {
@@ -112,6 +104,8 @@ export interface ServiceOrder {
   completionPhotoUrl?: string; // Data URL for the completion photo
   completionLatitude?: number;
   completionLongitude?: number;
+  quoteId?: string; // Link to Quote
+  invoiceId?: string; // Link to Invoice
 }
 
 export interface MaintenanceSchedule {
@@ -144,6 +138,7 @@ export interface WorkshopEquipment {
 // FIX: Add missing types for products, bank accounts, and invoicing.
 // --- PRODUCTOS MODULE TYPES ---
 export type ProductType = 'Inventario' | 'Manual';
+export type ProductStatus = 'Activo' | 'Inactivo' | 'Descontinuado';
 
 export interface Product {
     id: string;
@@ -155,6 +150,14 @@ export interface Product {
     sellPrice2: number;
     sellPrice3: number;
     stock: number;
+    // Nuevos campos QA
+    brand?: string; // Marca
+    description?: string; // Descripción
+    location?: string; // Ubicación en almacén
+    status?: ProductStatus; // Estado del producto
+    entryDate?: string; // Fecha de ingreso (YYYY-MM-DD)
+    lotOrSerial?: string; // Lote o número de serie
+    supplier?: string; // Proveedor
 }
 // --- END PRODUCTOS MODULE TYPES ---
 
@@ -232,10 +235,28 @@ export interface Quote {
 }
 // --- END INVOICING MODULE TYPES ---
 
+// --- EXPENSES MODULE TYPES ---
+export type ExpenseCategory = 'Nómina' | 'Servicios' | 'Repuestos' | 'Combustible' | 'Mantenimiento' | 'Alquiler' | 'Impuestos' | 'Marketing' | 'Otros';
+
+export interface Expense {
+    id: string;
+    date: Date;
+    category: ExpenseCategory;
+    description: string;
+    amount: number;
+    paymentMethod?: PaymentMethod;
+    bankAccountId?: string;
+    supplier?: string; // Proveedor o beneficiario
+    receiptUrl?: string; // URL del comprobante/recibo
+    createdById?: string;
+    createdAt: Date;
+}
+// --- END EXPENSES MODULE TYPES ---
 
 // --- END WORKSHOP MODULE TYPES ---
 export interface CompanyInfo {
   name: string;
+  rnc?: string; // RNC de la empresa
   address: string;
   phone: string;
   whatsapp: string;
@@ -244,7 +265,7 @@ export interface CompanyInfo {
 }
 
 // FIX: Add new app modes for invoicing features
-export type AppMode = 'inicio' | 'calendar' | 'staff' | 'calendars' | 'customers' | 'technician-calendar' | 'unconfirmed-appointments' | 'access-keys' | 'maintenance-schedules' | 'secretary-performance' | 'technician-performance' | 'workshop-equipment' | 'company-settings' | 'customer-map' | 'my-orders' | 'facturacion' | 'facturacion-form' | 'cotizaciones' | 'productos' | 'cuentas-bancarias';
+export type AppMode = 'inicio' | 'calendar' | 'staff' | 'calendars' | 'customers' | 'technician-calendar' | 'unconfirmed-appointments' | 'access-keys' | 'maintenance-schedules' | 'secretary-performance' | 'technician-performance' | 'workshop-equipment' | 'company-settings' | 'customer-map' | 'my-orders' | 'facturacion' | 'facturacion-form' | 'cotizaciones' | 'productos' | 'cuentas-bancarias' | 'gastos';
 
 export interface GoogleUser {
   name: string;
@@ -273,6 +294,7 @@ export interface SyncedAppState {
   bankAccounts: BankAccount[];
   lastInvoiceNumber: number;
   lastQuoteNumber: number;
+  expenses: Expense[];
 }
 
 // FIX: Add new local state properties for invoicing features
@@ -343,6 +365,10 @@ export interface AppContextType extends AppState {
   addBankAccount: (accountData: Omit<BankAccount, 'id'>) => Promise<void>;
   updateBankAccount: (accountId: string, accountData: Omit<BankAccount, 'id'>) => Promise<void>;
   deleteBankAccount: (accountId: string) => Promise<void>;
+  // EXPENSES
+  addExpense: (expenseData: Omit<Expense, 'id' | 'createdById' | 'createdAt'>) => Promise<void>;
+  updateExpense: (expenseId: string, expenseData: Omit<Expense, 'id' | 'createdById' | 'createdAt'>) => Promise<void>;
+  deleteExpense: (expenseId: string) => Promise<void>;
   setOrderToConvertToInvoice: (order: ServiceOrder | null) => void;
   setQuoteToConvertToInvoice: (quote: Quote | null) => void;
   setInvoiceToEdit: (invoice: Invoice | null) => void;

@@ -2,7 +2,7 @@
 import React, { useContext, useState, useMemo, useRef, useEffect } from 'react';
 import { AppContext, AppContextType, AppMode, Staff } from '../src/types';
 import { can } from '../src/permissions';
-import { Wrench, Users, User, CalendarDays, LogOut, AlertTriangle, FileText, CalendarCheck, Menu, X, Calendar as CalendarIcon, Key, ClipboardList, Activity, BarChart3, HardHat, Building2, Map, LayoutDashboard, FileSpreadsheet, Receipt, Package, Landmark } from 'lucide-react';
+import { Wrench, Users, User, CalendarDays, LogOut, AlertTriangle, FileText, CalendarCheck, Menu, X, Calendar as CalendarIcon, Key, ClipboardList, Activity, BarChart3, HardHat, Building2, Map, LayoutDashboard, FileSpreadsheet, Receipt, Package, Wallet } from 'lucide-react';
 
 const NavButton: React.FC<{ 
   targetMode: AppMode, 
@@ -126,7 +126,10 @@ export const Header: React.FC = () => {
       {can(currentUser, 'view', 'maintenance') && (
         <NavButton targetMode="maintenance-schedules" count={dueMaintenanceCount} onClick={() => onClickHandler('maintenance-schedules')} currentMode={mode} currentUser={currentUser}><ClipboardList size={18} /><span>Mantenimiento</span></NavButton>
       )}
-      
+      {can(currentUser, 'view', 'workshop') && (
+        <NavButton targetMode="workshop-equipment" onClick={() => onClickHandler('workshop-equipment')} currentMode={mode} currentUser={currentUser}><HardHat size={18}/><span>Equipos en Taller</span></NavButton>
+      )}
+
       <div className="border-t my-1 mx-2 border-slate-200"></div>
 
       <div className="px-4 pt-2 pb-1 text-xs font-semibold uppercase text-slate-400">Facturación & Finanzas</div>
@@ -139,8 +142,8 @@ export const Header: React.FC = () => {
       {can(currentUser, 'view', 'products') && (
         <NavButton targetMode="productos" onClick={() => onClickHandler('productos')} currentMode={mode} currentUser={currentUser}><Package size={18}/><span>Productos</span></NavButton>
       )}
-      {can(currentUser, 'view', 'bank-accounts') && (
-        <NavButton targetMode="cuentas-bancarias" onClick={() => onClickHandler('cuentas-bancarias')} currentMode={mode} currentUser={currentUser}><Landmark size={18}/><span>Cuentas Bancarias</span></NavButton>
+      {can(currentUser, 'view', 'invoices') && (
+        <NavButton targetMode="gastos" onClick={() => onClickHandler('gastos')} currentMode={mode} currentUser={currentUser}><Wallet size={18}/><span>Gastos</span></NavButton>
       )}
 
       <div className="border-t my-1 mx-2 border-slate-200"></div>
@@ -154,9 +157,6 @@ export const Header: React.FC = () => {
       )}
       {can(currentUser, 'view', 'staff') && (
         <NavButton targetMode="staff" onClick={() => onClickHandler('staff')} currentMode={mode} currentUser={currentUser}><Users size={18} /><span>Personal</span></NavButton>
-      )}
-      {can(currentUser, 'view', 'workshop') && (
-        <NavButton targetMode="workshop-equipment" onClick={() => onClickHandler('workshop-equipment')} currentMode={mode} currentUser={currentUser}><HardHat size={18}/><span>Equipos en Taller</span></NavButton>
       )}
       {can(currentUser, 'view', 'calendars') && (
         <NavButton targetMode="calendars" onClick={() => onClickHandler('calendars')} currentMode={mode} currentUser={currentUser}><CalendarDays size={18} /><span>Calendarios</span></NavButton>

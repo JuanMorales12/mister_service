@@ -1,7 +1,8 @@
 import React, { useContext } from 'react';
 import { AppContext, AppContextType } from '../src/types';
-import { Printer, Share2, X } from 'lucide-react';
+import { Printer, Share2, X, MessageCircle } from 'lucide-react';
 import logo from '../assets/logo.jpg';
+import { formatCurrency } from '../src/utils';
 
 export const InvoicePrintView: React.FC = () => {
     const { invoiceToPrint, setInvoiceToPrint, companyInfo, setGlobalError } = useContext(AppContext) as AppContextType;
@@ -42,6 +43,45 @@ export const InvoicePrintView: React.FC = () => {
         }
     };
 
+    const handleShareWhatsApp = () => {
+        const balanceDueAmount = invoice.total - invoice.paidAmount;
+        const itemsList = invoice.items.map(item => `• ${item.quantity}x ${item.description}: RD$ ${formatCurrency(item.quantity * item.sellPrice)}`).join('\n');
+
+        const message = `*${companyInfo.name}*
+━━━━━━━━━━━━━━━━━
+*FACTURA #${invoice.invoiceNumber}*
+Fecha: ${new Date(invoice.date).toLocaleDateString('es-ES')}
+━━━━━━━━━━━━━━━━━
+
+*Cliente:* ${customer.name}
+${customer.phone ? `*Tel:* ${customer.phone}` : ''}
+
+*Detalle:*
+${itemsList}
+
+━━━━━━━━━━━━━━━━━
+*Subtotal:* RD$ ${formatCurrency(invoice.subtotal)}
+${invoice.discount > 0 ? `*Descuento:* -RD$ ${formatCurrency(invoice.discount)}` : ''}
+*ITBIS (${invoice.isTaxable ? '18%' : '0%'}):* RD$ ${formatCurrency(invoice.taxes)}
+*TOTAL:* RD$ ${formatCurrency(invoice.total)}
+${invoice.paidAmount > 0 ? `*Pagado:* RD$ ${formatCurrency(invoice.paidAmount)}` : ''}
+${balanceDueAmount > 0 ? `*Balance Pendiente:* RD$ ${formatCurrency(balanceDueAmount)}` : '*PAGADO*'}
+━━━━━━━━━━━━━━━━━
+
+${companyInfo.phone ? `Tel: ${companyInfo.phone}` : ''}
+${companyInfo.email ? `Email: ${companyInfo.email}` : ''}
+
+_Gracias por su preferencia_`;
+
+        const phoneNumber = customer.phone?.replace(/\D/g, '') || '';
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappUrl = phoneNumber
+            ? `https://wa.me/${phoneNumber.startsWith('1') || phoneNumber.startsWith('809') || phoneNumber.startsWith('829') || phoneNumber.startsWith('849') ? phoneNumber : '1' + phoneNumber}?text=${encodedMessage}`
+            : `https://wa.me/?text=${encodedMessage}`;
+
+        window.open(whatsappUrl, '_blank');
+    };
+
     return (
         <div className="fixed inset-0 z-[9999] print-container">
             <div className="fixed top-4 right-4 flex flex-col gap-2 no-print z-[10000]">
@@ -51,8 +91,11 @@ export const InvoicePrintView: React.FC = () => {
                 <button onClick={handlePrint} className="p-3 bg-sky-600 text-white rounded-full shadow-lg hover:bg-sky-700">
                     <Printer size={20}/>
                 </button>
-                <button onClick={handleShare} className="p-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700">
+                <button onClick={handleShare} className="p-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700" title="Compartir">
                     <Share2 size={20}/>
+                </button>
+                <button onClick={handleShareWhatsApp} className="p-3 bg-emerald-500 text-white rounded-full shadow-lg hover:bg-emerald-600" title="Enviar por WhatsApp">
+                    <MessageCircle size={20}/>
                 </button>
             </div>
             <div className="A4-sheet">
@@ -82,10 +125,12 @@ export const InvoicePrintView: React.FC = () => {
                         <h3 className="font-semibold text-slate-700">Facturar a:</h3>
                         <p className="font-bold">{customer.name}</p>
                         <p>Tel: {customer.phone}</p>
+                        {customer.email && <p>Email: {customer.email}</p>}
+                        {customer.rnc && <p>RNC: {customer.rnc}</p>}
                     </div>
                      <div className="p-3 border rounded-md bg-slate-50 text-right">
                          <p><b>Factura No.:</b> <span className="font-mono">{invoice.invoiceNumber}</span></p>
-                         <p><b>NCF:</b> <span className="font-mono">B0100058375</span></p>
+                         {companyInfo.rnc && <p><b>RNC:</b> <span className="font-mono">{companyInfo.rnc}</span></p>}
                          <p><b>Estado:</b> {invoice.status}</p>
                     </div>
                 </section>
@@ -114,30 +159,30 @@ export const InvoicePrintView: React.FC = () => {
                                 <tr key={item.id} className="border-b">
                                     <td className="p-2">{item.quantity}</td>
                                     <td className="p-2">{item.description}</td>
-                                    <td className="p-2 text-right">RD$ {item.sellPrice.toFixed(2)}</td>
-                                    <td className="p-2 text-right">RD$ {(item.quantity * item.sellPrice).toFixed(2)}</td>
+                                    <td className="p-2 text-right">RD$ {formatCurrency(item.sellPrice)}</td>
+                                    <td className="p-2 text-right">RD$ {formatCurrency(item.quantity * item.sellPrice)}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </section>
-                
+
                 {/* Totals */}
                 <section className="mt-6 flex justify-end">
                     <div className="w-64 space-y-2 text-sm">
-                        <div className="flex justify-between"><span>Subtotal:</span> <span>RD$ {invoice.subtotal.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>Subtotal:</span> <span>RD$ {formatCurrency(invoice.subtotal)}</span></div>
                         {invoice.discount > 0 && (
-                            <div className="flex justify-between"><span>Descuento:</span> <span>- RD$ {invoice.discount.toFixed(2)}</span></div>
+                            <div className="flex justify-between"><span>Descuento:</span> <span>- RD$ {formatCurrency(invoice.discount)}</span></div>
                         )}
-                        <div className="flex justify-between"><span>ITBIS ({invoice.isTaxable ? '18%' : '0%'}):</span> <span>RD$ {invoice.taxes.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>ITBIS ({invoice.isTaxable ? '18%' : '0%'}):</span> <span>RD$ {formatCurrency(invoice.taxes)}</span></div>
                         <div className="flex justify-between text-lg font-bold border-t-2 border-slate-700 mt-2 pt-2">
                             <span>Total General:</span>
-                            <span>RD$ {invoice.total.toFixed(2)}</span>
+                            <span>RD$ {formatCurrency(invoice.total)}</span>
                         </div>
-                        <div className="flex justify-between text-slate-600"><span>Total Pagado:</span> <span>RD$ {invoice.paidAmount.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-slate-600"><span>Total Pagado:</span> <span>RD$ {formatCurrency(invoice.paidAmount)}</span></div>
                         <div className={`flex justify-between font-bold ${balanceDue > 0 ? 'text-red-600' : 'text-green-600'}`}>
                             <span>Balance:</span>
-                            <span>RD$ {balanceDue.toFixed(2)}</span>
+                            <span>RD$ {formatCurrency(balanceDue)}</span>
                         </div>
                     </div>
                 </section>
@@ -199,6 +244,18 @@ export const InvoicePrintView: React.FC = () => {
                     }
                     .no-print {
                         display: none;
+                    }
+                    section {
+                        page-break-inside: avoid;
+                    }
+                    table {
+                        page-break-inside: avoid;
+                    }
+                    thead {
+                        display: table-header-group;
+                    }
+                    tr {
+                        page-break-inside: avoid;
                     }
                 }
                 @page {

@@ -99,35 +99,41 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({ isOpen, onCl
                     </div>
 
                     {type === 'Inventario' ? (
-                        <div>
-                            <label className="label-style">Productos</label>
-                            <select value={selectedProductId} onChange={e => handleProductSelection(e.target.value)} className="mt-1 input-style">
-                                <option value="">Seleccionar producto</option>
-                                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </div>
+                        <>
+                            <div>
+                                <label className="label-style">Producto</label>
+                                <select value={selectedProductId} onChange={e => handleProductSelection(e.target.value)} className="mt-1 input-style">
+                                    <option value="">Seleccionar producto</option>
+                                    {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                            </div>
+                            {selectedProductId && (
+                                <div>
+                                    <label className="label-style">Descripción</label>
+                                    <input type="text" readOnly value={description} className="mt-1 input-style"/>
+                                </div>
+                            )}
+                        </>
                     ) : (
                          <div>
-                            <label className="label-style">Descripción (Producto Manual)</label>
+                            <label className="label-style">Descripción</label>
                             <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="mt-1 input-style" placeholder="Ej: Pieza usada compresor"/>
                         </div>
                     )}
                     
-                    <input type="text" readOnly value={description} className="mt-1 input-style" placeholder="Descripción del producto..."/>
-                    
                      <div>
                         <label className="label-style">Cantidad</label>
-                        <input type="number" value={quantity} onChange={e => setQuantity(parseInt(e.target.value) || 1)} onFocus={e => e.target.select()} className="mt-1 input-style" min="1"/>
+                        <input type="number" value={quantity || ''} onChange={e => setQuantity(e.target.value === '' ? 1 : parseInt(e.target.value))} onFocus={e => e.target.select()} className="mt-1 input-style" min="1"/>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="label-style">Precio Compra</label>
-                            <input type="number" value={purchasePrice} onChange={e => setPurchasePrice(parseFloat(e.target.value) || 0)} onFocus={e => e.target.select()} className="mt-1 input-style" step="0.01"/>
+                            <input type="number" value={purchasePrice || ''} onChange={e => setPurchasePrice(e.target.value === '' ? 0 : parseFloat(e.target.value))} onFocus={e => e.target.select()} className="mt-1 input-style" step="0.01"/>
                         </div>
                         <div>
                             <label className="label-style">Precio Venta</label>
-                            <input type="number" value={sellPrice} onChange={e => setSellPrice(parseFloat(e.target.value) || 0)} onFocus={e => e.target.select()} className="mt-1 input-style" step="0.01"/>
+                            <input type="number" value={sellPrice || ''} onChange={e => setSellPrice(e.target.value === '' ? 0 : parseFloat(e.target.value))} onFocus={e => e.target.select()} className="mt-1 input-style" step="0.01"/>
                         </div>
                     </div>
                     
@@ -143,7 +149,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({ isOpen, onCl
                             </div>
                             <div>
                                 <label className="label-style">Comisión</label>
-                                <input type="number" value={commission} onChange={e => setCommission(parseFloat(e.target.value) || 0)} onFocus={e => e.target.select()} className="mt-1 input-style" disabled={!technicianId}/>
+                                <input type="number" value={commission || ''} onChange={e => setCommission(e.target.value === '' ? 0 : parseFloat(e.target.value))} onFocus={e => e.target.select()} className="mt-1 input-style" disabled={!technicianId}/>
                             </div>
                         </div>
                     </div>

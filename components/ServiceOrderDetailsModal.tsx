@@ -1,9 +1,10 @@
 
 import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { AppContext, AppContextType, ServiceOrder, ServiceOrderStatus } from '../src/types';
-import { X, Edit, Phone, MapPin, Wrench, User, Calendar as CalendarIcon, Save, Info, Search, Clock, History, RefreshCw, Camera, CheckCircle, Loader2 } from 'lucide-react';
+import { X, Edit, Phone, MapPin, Wrench, User, Calendar as CalendarIcon, Save, Info, Search, Clock, History, RefreshCw, Camera, CheckCircle, Loader2, FileSpreadsheet, FileText, DollarSign } from 'lucide-react';
 import { CompleteOrderModal } from './CompleteOrderModal';
 import { AddressAutocompleteInput } from './AddressAutocompleteInput';
+import { RecordPaymentModal } from './RecordPaymentModal';
 
 interface ServiceOrderDetailsModalProps {
   isOpen: boolean;
@@ -22,9 +23,10 @@ const statusColorClasses: Record<ServiceOrderStatus, string> = {
 };
 
 export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> = ({ isOpen, onClose, order }) => {
-  const { staff, calendars, updateServiceOrder, serviceOrders, currentUser } = useContext(AppContext) as AppContextType;
+  const { staff, calendars, updateServiceOrder, serviceOrders, currentUser, quotes, invoices, setQuoteToConvertToInvoice, setMode } = useContext(AppContext) as AppContextType;
   const [isEditing, setIsEditing] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [addressInputKey, setAddressInputKey] = useState(0);
 
@@ -44,6 +46,10 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   
   const technician = useMemo(() => staff.find(s => s.calendarId === order?.calendarId), [staff, order]);
   const creator = useMemo(() => staff.find(s => s.id === order?.createdById), [staff, order]);
+
+  // Get associated quote and invoice
+  const associatedQuote = useMemo(() => order?.quoteId ? quotes.find(q => q.id === order.quoteId) : null, [order, quotes]);
+  const associatedInvoice = useMemo(() => order?.invoiceId ? invoices.find(i => i.id === order.invoiceId) : null, [order, invoices]);
 
   useEffect(() => {
     if (isOpen && order) {
@@ -76,7 +82,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
     const selectedDayEnd = new Date(`${appointmentDate}T23:59:59`);
 
     serviceOrders.forEach(o => {
-      if (o.id !== order.id && o.calendarId === calendarId && o.start && o.status !== 'Cancelado') {
+      if (o.id !== order.id && o.calendarId === calendarId && o.start && o.status !== 'Cancelado' && o.status !== 'No Agendado') {
         const orderDate = new Date(o.start);
         if (orderDate >= selectedDayStart && orderDate <= selectedDayEnd) {
           occupied.add(orderDate.toTimeString().substring(0, 5));
@@ -91,7 +97,27 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
       const selectedCalendar = calendars.find(c => c.id === calendarId);
       const dayOfWeek = new Date(appointmentDate).getUTCDay();
       const dayAvailability = selectedCalendar?.availability?.find(d => d.dayOfWeek === dayOfWeek);
-      setAvailableTimeSlots(dayAvailability?.slots.map(slot => slot.startTime).sort() || []);
+      const slots = dayAvailability?.slots || [];
+
+      // Generar horas disponibles de 9:00 a 18:00 (cada hora) dentro de los slots configurados
+      const hourlySlots: string[] = [];
+
+      for (let hour = 9; hour <= 18; hour++) {
+        const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+
+        // Verificar si esta hora está dentro de algún slot configurado
+        const isWithinSlot = slots.some(slot => {
+          const [startHour] = slot.startTime.split(':').map(Number);
+          const [endHour] = slot.endTime.split(':').map(Number);
+          return hour >= startHour && hour <= endHour;
+        });
+
+        if (isWithinSlot) {
+          hourlySlots.push(timeStr);
+        }
+      }
+
+      setAvailableTimeSlots(hourlySlots);
     } else {
       setAvailableTimeSlots([]);
     }
@@ -156,11 +182,20 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
     return cal?.active;
   }), [staff, calendars]);
 
+  const handleConvertQuoteToInvoice = () => {
+    if (associatedQuote) {
+      setQuoteToConvertToInvoice(associatedQuote);
+      setMode('facturacion-form');
+      onClose();
+    }
+  };
+
   if (!isOpen || !order) return null;
 
   const isTechnicianUser = currentUser?.role === 'tecnico';
   const canEdit = !isTechnicianUser || ['Pendiente', 'En Proceso', 'Garantía'].includes(order.status);
   const canComplete = isTechnicianUser && ['Pendiente', 'En Proceso', 'Garantía'].includes(order.status);
+  const canManagePayment = (currentUser?.role === 'administrador' || currentUser?.role === 'secretaria') && associatedInvoice;
 
   return (
     <>
@@ -298,6 +333,59 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                 </section>
              )}
 
+            {/* Quote & Invoice Section */}
+            {(associatedQuote || associatedInvoice) && (
+                <section>
+                    <h3 className="text-lg font-semibold text-slate-600 mb-2">Documentos Asociados</h3>
+                    <div className="p-3 bg-slate-50 border rounded-md space-y-3">
+                        {associatedQuote && (
+                            <div className="flex items-center justify-between p-2 bg-white rounded border">
+                                <div className="flex items-center gap-2">
+                                    <FileSpreadsheet size={18} className="text-amber-600"/>
+                                    <div>
+                                        <p className="font-medium text-slate-800">Cotización #{associatedQuote.quoteNumber}</p>
+                                        <p className="text-xs text-slate-500">Total: RD$ {associatedQuote.total.toLocaleString('es-DO', { minimumFractionDigits: 2 })} - {associatedQuote.status}</p>
+                                    </div>
+                                </div>
+                                {associatedQuote.status !== 'Aceptada' && (
+                                    <button
+                                        onClick={handleConvertQuoteToInvoice}
+                                        className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 flex items-center gap-1"
+                                    >
+                                        <FileText size={14}/> Convertir a Factura
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        {associatedInvoice && (
+                            <div className="flex items-center justify-between p-2 bg-white rounded border">
+                                <div className="flex items-center gap-2">
+                                    <FileText size={18} className="text-sky-600"/>
+                                    <div>
+                                        <p className="font-medium text-slate-800">Factura #{associatedInvoice.invoiceNumber}</p>
+                                        <p className="text-xs text-slate-500">
+                                            Total: RD$ {associatedInvoice.total.toLocaleString('es-DO', { minimumFractionDigits: 2 })} -
+                                            Pagado: RD$ {associatedInvoice.paidAmount.toLocaleString('es-DO', { minimumFractionDigits: 2 })} -
+                                            <span className={`ml-1 ${associatedInvoice.status === 'Pagada' ? 'text-green-600' : 'text-amber-600'}`}>
+                                                {associatedInvoice.status}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                                {canManagePayment && associatedInvoice.status !== 'Pagada' && (
+                                    <button
+                                        onClick={() => setIsPaymentModalOpen(true)}
+                                        className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 flex items-center gap-1"
+                                    >
+                                        <DollarSign size={14}/> Registrar Pago
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </section>
+            )}
+
           </main>
 
           <footer className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t">
@@ -322,6 +410,13 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
         </div>
       </div>
       {isCompleteModalOpen && <CompleteOrderModal isOpen={isCompleteModalOpen} onClose={() => { setIsCompleteModalOpen(false); onClose(); }} order={order} />}
+      {isPaymentModalOpen && associatedInvoice && (
+        <RecordPaymentModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          invoice={associatedInvoice}
+        />
+      )}
       <style>{`
         .input-style { display: block; width: 100%; padding: 0.5rem 0.75rem; background-color: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; }
         .input-style:read-only { background-color: #f1f5f9; cursor: not-allowed; }

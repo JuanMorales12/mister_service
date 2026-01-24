@@ -322,21 +322,18 @@ export const InvoiceFormModal: React.FC = () => {
                                     <input type="date" value={date.toISOString().split('T')[0]} readOnly disabled className="mt-1 input-style"/>
                                 </div>
                                 <div>
-                                    <label htmlFor="discount-percent" className="label-style">Descuento</label>
-                                    <div className="relative mt-1">
-                                        <input 
-                                            type="number" 
-                                            id="discount-percent" 
-                                            value={discount} 
-                                            onChange={e => setDiscount(parseFloat(e.target.value) || 0)} 
-                                            onFocus={e => e.target.select()} 
-                                            className="input-style text-right pr-7" 
-                                            min="0" 
-                                            max="100" 
-                                            step="any"
-                                        />
-                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
-                                    </div>
+                                    <label htmlFor="discount-percent" className="label-style">Descuento (%)</label>
+                                    <input
+                                        type="number"
+                                        id="discount-percent"
+                                        value={discount || ''}
+                                        onChange={e => setDiscount(e.target.value === '' ? 0 : parseFloat(e.target.value))}
+                                        onFocus={e => e.target.select()}
+                                        className="mt-1 input-style text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        min="0"
+                                        max="100"
+                                        step="any"
+                                    />
                                 </div>
                             </div>
                         </div>

@@ -166,12 +166,12 @@ export const WorkshopEquipmentFormModal: React.FC<WorkshopEquipmentFormModalProp
                             </ul>
                         </div>
                     )}
-                </div>
-                <div className="flex justify-end gap-4 pt-6 mt-4 border-t">
-                    <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-slate-100 hover:bg-slate-200">Cancelar</button>
-                    <button type="submit" className="px-4 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700 flex items-center gap-2">
-                        <Save size={16}/> {isEditMode ? 'Guardar Cambios' : 'Guardar Equipo'}
-                    </button>
+                    <div className="flex justify-end gap-4 pt-6 mt-4 border-t">
+                        <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-slate-100 hover:bg-slate-200">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700 flex items-center gap-2">
+                            <Save size={16}/> {isEditMode ? 'Guardar Cambios' : 'Guardar Equipo'}
+                        </button>
+                    </div>
                 </div>
                 <style>{`.input-style { color: #0f172a; display: block; width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; } .label-style { display: block; font-medium; color: #334155; }`}</style>
             </form>

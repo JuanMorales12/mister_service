@@ -1,9 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { 
-    getFirestore, 
-    doc, 
-    getDoc, 
-    setDoc, 
+import {
+    getFirestore,
+    doc,
+    getDoc,
+    setDoc,
     onSnapshot,
     Timestamp,
     runTransaction
@@ -17,6 +17,12 @@ import {
     updatePassword,
     User
 } from "firebase/auth";
+import {
+    getStorage,
+    ref,
+    uploadBytes,
+    getDownloadURL
+} from "firebase/storage";
 import { SyncedAppState, Customer, ServiceOrder, Staff } from "../types";
 
 // Your web app's Firebase configuration
@@ -36,6 +42,7 @@ const app = initializeApp(firebaseConfig);
 console.log("Firebase initialized", app);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
 // Test Firestore connection
 getDoc(doc(db, "appState", "main")).then(docSnap => {
@@ -247,5 +254,17 @@ export const firebaseService = {
             console.error("Error listening to state changes:", error);
         });
         return unsubscribe;
+    },
+
+    async uploadFile(file: File, path: string): Promise<string> {
+        try {
+            const storageRef = ref(storage, path);
+            await uploadBytes(storageRef, file);
+            const downloadUrl = await getDownloadURL(storageRef);
+            return downloadUrl;
+        } catch (error) {
+            console.error("Error uploading file to Storage:", error);
+            throw error;
+        }
     }
 };

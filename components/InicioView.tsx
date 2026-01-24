@@ -2,8 +2,9 @@
 import React, { useContext, useMemo, useState } from 'react';
 // NOTE: Importing from '../src/types' to ensure we use the SAME AppContext instance provided by src/App.tsx.
 // Previously this file imported from '../types' (root), creating a second, distinct context and always receiving null.
-import { AppContext, AppContextType } from '../src/types';
-import { Calendar as CalendarIcon, ArrowRight } from 'lucide-react';
+import { AppContext, AppContextType, ExpenseCategory } from '../src/types';
+import { Calendar as CalendarIcon, ArrowRight, AlertTriangle, Package, Users, Clock, TrendingUp, Wrench, Receipt } from 'lucide-react';
+import { formatCurrency } from '../src/utils';
 
 // --- Helper Components for Charts ---
 
@@ -154,10 +155,19 @@ export const InicioView: React.FC = () => {
     if (!context) {
         return <div>Error: El contexto de la app no está disponible.</div>;
     }
-    const { quotes, invoices, serviceOrders, setMode } = context;
+    const { quotes, invoices, serviceOrders, setMode, products, staff, calendars, expenses } = context;
 
     // --- Time range state for Sales/Purchases chart ---
     const [range, setRange] = useState<'today' | 'week' | 'month' | 'year'>('month');
+
+    // --- Year filter for annual billing ---
+    const availableYears = useMemo(() => {
+        const years = new Set<number>();
+        invoices.forEach(inv => years.add(new Date(inv.date).getFullYear()));
+        if (years.size === 0) years.add(new Date().getFullYear());
+        return Array.from(years).sort((a, b) => b - a);
+    }, [invoices]);
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
     // --- 1. Calculate Metrics ---
     const metrics = useMemo(() => {
@@ -172,7 +182,7 @@ export const InicioView: React.FC = () => {
         const quotesTrend = quotes.slice(0, 10).map(q => q.total).reverse(); 
         if (quotesTrend.length < 5) quotesTrend.push(0, 0, 0, 0, 0); // Fill if empty
 
-        // B. Service Orders (Conduce / Work Orders)
+        // B. Service Orders (Órdenes Activas)
         // We approximate value based on Invoices linked to Service Orders
         const totalOrdersValue = invoices
             .filter(i => i.serviceOrderId) // Only invoices from orders
@@ -188,6 +198,31 @@ export const InicioView: React.FC = () => {
         // Bar chart data (last 10 invoices)
         const invoicesBarData = invoices.slice(0, 10).map(i => i.total);
         while(invoicesBarData.length < 7) invoicesBarData.push(0);
+
+        // C2. Facturas Emitidas Hoy vs Mes vs Pagadas al Mes
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const invoicesEmittedToday = invoices.filter(inv => {
+            const invDate = new Date(inv.date);
+            return inv.status !== 'Borrador' && invDate >= startOfToday;
+        });
+        const invoicesEmittedThisMonth = invoices.filter(inv => {
+            const invDate = new Date(inv.date);
+            return inv.status !== 'Borrador' && invDate >= startOfMonth;
+        });
+        const invoicesPaidThisMonth = invoices.filter(inv => {
+            return inv.status === 'Pagada' && inv.payments.some(p => {
+                const payDate = new Date(p.paymentDate);
+                return payDate >= startOfMonth;
+            });
+        });
+
+        const invoiceStats = {
+            emittedToday: { count: invoicesEmittedToday.length, total: invoicesEmittedToday.reduce((s, i) => s + i.total, 0) },
+            emittedMonth: { count: invoicesEmittedThisMonth.length, total: invoicesEmittedThisMonth.reduce((s, i) => s + i.total, 0) },
+            paidMonth: { count: invoicesPaidThisMonth.length, total: invoicesPaidThisMonth.reduce((s, i) => s + i.paidAmount, 0) }
+        };
 
         // D. Balance
         const totalPaid = invoices.reduce((sum, i) => sum + i.paidAmount, 0);
@@ -288,19 +323,160 @@ export const InicioView: React.FC = () => {
             });
         }
 
+        // F. Critical Stock (productos con stock <= 5)
+        const criticalStockProducts = products
+            .filter(p => p.stock <= 5 && (p.status === 'Activo' || !p.status))
+            .sort((a, b) => a.stock - b.stock);
+
+        // G. Estado de Casos por Técnico
+        const technicians = staff.filter(s => s.role === 'tecnico');
+        const technicianStats = technicians.map(tech => {
+            const techCalendar = calendars.find(c => c.userId === tech.id);
+            const techOrders = serviceOrders.filter(o => o.calendarId === techCalendar?.id);
+            return {
+                id: tech.id,
+                name: tech.name,
+                photo: tech.employeePhotoUrl,
+                pending: techOrders.filter(o => o.status === 'Pendiente').length,
+                inProgress: techOrders.filter(o => o.status === 'En Proceso').length,
+                completed: techOrders.filter(o => o.status === 'Completado').length,
+                total: techOrders.length
+            };
+        }).filter(t => t.total > 0 || technicians.length <= 5); // Solo mostrar técnicos con órdenes o si hay pocos
+
+        // H. Órdenes Atrasadas (SLA - más de 24 horas desde creación sin completar)
+        const overdueOrders = serviceOrders
+            .filter(order => {
+                if (order.status === 'Completado' || order.status === 'Cancelado') return false;
+                const createdAt = new Date(order.createdAt);
+                const hoursSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+                return hoursSinceCreation > 24; // SLA de 24 horas
+            })
+            .map(order => {
+                const createdAt = new Date(order.createdAt);
+                const hoursSinceCreation = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60));
+                const daysSinceCreation = Math.floor(hoursSinceCreation / 24);
+                const techCalendar = calendars.find(c => c.id === order.calendarId);
+                const technician = staff.find(s => s.id === techCalendar?.userId);
+                return {
+                    id: order.id,
+                    orderNumber: order.serviceOrderNumber,
+                    customerName: order.customerName,
+                    applianceType: order.applianceType,
+                    status: order.status,
+                    technicianName: technician?.name || 'Sin asignar',
+                    hoursSinceCreation,
+                    daysSinceCreation,
+                    createdAt
+                };
+            })
+            .sort((a, b) => b.hoursSinceCreation - a.hoursSinceCreation);
+
+        // I. Rendimiento por Técnico (últimos 30 días)
+        const thirtyDaysAgoForPerf = new Date();
+        thirtyDaysAgoForPerf.setDate(thirtyDaysAgoForPerf.getDate() - 30);
+
+        const technicianPerformance = technicians.map(tech => {
+            const techCalendar = calendars.find(c => c.userId === tech.id);
+            const recentOrders = serviceOrders.filter(o => {
+                if (o.calendarId !== techCalendar?.id) return false;
+                const createdAt = new Date(o.createdAt);
+                return createdAt >= thirtyDaysAgoForPerf;
+            });
+
+            const completed = recentOrders.filter(o => o.status === 'Completado').length;
+            const total = recentOrders.length;
+            const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+            // Calcular facturación del técnico
+            const techInvoices = invoices.filter(inv => {
+                const invDate = new Date(inv.date);
+                if (invDate < thirtyDaysAgoForPerf) return false;
+                // Revisar si algún item tiene comisión para este técnico
+                return inv.items.some(item => item.commission?.technicianId === tech.id);
+            });
+            const revenue = techInvoices.reduce((sum, inv) => sum + inv.total, 0);
+
+            return {
+                id: tech.id,
+                name: tech.name,
+                photo: tech.employeePhotoUrl,
+                completed,
+                total,
+                completionRate,
+                revenue
+            };
+        }).filter(t => t.total > 0).sort((a, b) => b.completed - a.completed);
+
+        // J. Reparaciones por Tipo de Equipo
+        const equipmentTypeCounts: Record<string, number> = {};
+        serviceOrders.forEach(order => {
+            // Normalizar el tipo de equipo (extraer el tipo base)
+            let equipmentType = order.applianceType?.trim() || 'Sin especificar';
+            // Si contiene marca, extraer solo el tipo (ej: "Lavadora Samsung" -> "Lavadora")
+            const firstWord = equipmentType.split(' ')[0];
+            // Usar primera palabra si es un tipo común
+            const commonTypes = ['Lavadora', 'Nevera', 'Refrigerador', 'Secadora', 'Aire', 'Microondas', 'Estufa', 'Lavavajillas', 'Congelador', 'Dispensador'];
+            if (commonTypes.some(t => firstWord.toLowerCase().startsWith(t.toLowerCase()))) {
+                equipmentType = firstWord;
+            }
+            equipmentTypeCounts[equipmentType] = (equipmentTypeCounts[equipmentType] || 0) + 1;
+        });
+
+        const repairsByEquipmentType = Object.entries(equipmentTypeCounts)
+            .map(([type, count]) => ({ type, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+
+        // K. Gastos del mes actual
+        const expensesThisMonth = (expenses || []).filter(exp => {
+            const expDate = new Date(exp.date);
+            return expDate >= startOfMonth;
+        });
+        const totalExpensesMonth = expensesThisMonth.reduce((sum, e) => sum + e.amount, 0);
+
+        // Gastos por categoría
+        const expensesByCategory: Record<string, number> = {};
+        expensesThisMonth.forEach(exp => {
+            expensesByCategory[exp.category] = (expensesByCategory[exp.category] || 0) + exp.amount;
+        });
+        const expenseCategoryBreakdown = Object.entries(expensesByCategory)
+            .map(([category, total]) => ({ category: category as ExpenseCategory, total }))
+            .sort((a, b) => b.total - a.total);
+
+        // Balance neto (facturado - gastos)
+        const netBalance = invoiceStats.emittedMonth.total - totalExpensesMonth;
+
         return {
             quotes: { total: totalQuotesValue, pending: pendingQuotesCount, trend: quotesTrend },
             orders: { total: totalOrdersValue, pending: pendingOrdersCount, trend: ordersTrend },
-            invoices: { total: totalInvoicesValue, count: emittedInvoicesCount, bars: invoicesBarData },
-            balance: { 
-                totalDue, 
-                percent: duePercentage, 
+            invoices: { total: totalInvoicesValue, count: emittedInvoicesCount, bars: invoicesBarData, stats: invoiceStats },
+            balance: {
+                totalDue,
+                percent: duePercentage,
                 old: { val: balanceOld, count: countOld },
                 new: { val: balanceNew, count: countNew }
             },
-            chart: { labels: chartLabels, sales: salesData, purchases: purchasesData }
+            chart: { labels: chartLabels, sales: salesData, purchases: purchasesData },
+            criticalStock: criticalStockProducts,
+            technicianStats,
+            overdueOrders,
+            technicianPerformance,
+            repairsByEquipmentType,
+            annualBilling: {
+                year: selectedYear,
+                total: invoices.filter(inv => new Date(inv.date).getFullYear() === selectedYear).reduce((s, i) => s + i.total, 0),
+                paid: invoices.filter(inv => new Date(inv.date).getFullYear() === selectedYear).reduce((s, i) => s + i.paidAmount, 0),
+                count: invoices.filter(inv => new Date(inv.date).getFullYear() === selectedYear).length
+            },
+            expenses: {
+                totalMonth: totalExpensesMonth,
+                count: expensesThisMonth.length,
+                byCategory: expenseCategoryBreakdown,
+                netBalance
+            }
         };
-    }, [quotes, invoices, serviceOrders, range]);
+    }, [quotes, invoices, serviceOrders, range, products, staff, calendars, selectedYear, expenses]);
 
     const currencyFormatter = new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' });
     const currentDate = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -343,15 +519,15 @@ export const InicioView: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Card 2: Conduce (Work Orders) */}
+                {/* Card 2: Órdenes Activas */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 transition-transform hover:shadow-md">
                      <div className="flex justify-between items-start mb-4">
                         <div>
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">CONDUCE</p>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ÓRDENES ACTIVAS</p>
                             <h3 className="text-2xl font-bold text-slate-800 mt-1">{currencyFormatter.format(metrics.orders.total)}</h3>
                         </div>
-                        <button 
-                            onClick={() => setMode('calendar')} 
+                        <button
+                            onClick={() => setMode('calendar')}
                             className="text-slate-400 hover:text-sky-600 transition-colors"
                             title="Ir a Órdenes de Servicio"
                         >
@@ -393,6 +569,165 @@ export const InicioView: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Facturas Emitidas vs Pagadas */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-slate-700">FACTURAS EMITIDAS vs PAGADAS</h3>
+                    <button
+                        onClick={() => setMode('facturacion')}
+                        className="text-slate-400 hover:text-sky-600 transition-colors"
+                        title="Ver Facturación"
+                    >
+                        <ArrowRight size={20} />
+                    </button>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="p-4 bg-sky-50 rounded-lg border border-sky-100">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Emitidas Hoy</p>
+                        <p className="text-2xl font-bold text-slate-800">{metrics.invoices.stats.emittedToday.count}</p>
+                        <p className="text-sm text-sky-600 font-medium">{currencyFormatter.format(metrics.invoices.stats.emittedToday.total)}</p>
+                    </div>
+                    <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Emitidas (Mes)</p>
+                        <p className="text-2xl font-bold text-slate-800">{metrics.invoices.stats.emittedMonth.count}</p>
+                        <p className="text-sm text-indigo-600 font-medium">{currencyFormatter.format(metrics.invoices.stats.emittedMonth.total)}</p>
+                    </div>
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-100">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pagadas (Mes)</p>
+                        <p className="text-2xl font-bold text-slate-800">{metrics.invoices.stats.paidMonth.count}</p>
+                        <p className="text-sm text-green-600 font-medium">{currencyFormatter.format(metrics.invoices.stats.paidMonth.total)}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Total Facturado Anual */}
+            <div className="bg-gradient-to-r from-violet-500 to-purple-600 p-6 rounded-xl shadow-sm text-white">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-white/80">TOTAL FACTURADO ANUAL</h3>
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(Number(e.target.value))}
+                        className="bg-white/20 border border-white/30 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+                    >
+                        {availableYears.map(year => (
+                            <option key={year} value={year} className="text-slate-800">{year}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex items-end gap-4">
+                    <div>
+                        <p className="text-3xl font-bold text-white">{currencyFormatter.format(metrics.annualBilling.total)}</p>
+                        <p className="text-sm font-medium text-white/70 mt-1">{metrics.annualBilling.count} facturas emitidas</p>
+                    </div>
+                    <div className="flex-1 text-right">
+                        <p className="text-xs font-bold uppercase tracking-wider text-white/70 mb-1">Cobrado:</p>
+                        <p className="text-xl font-bold text-emerald-300">{currencyFormatter.format(metrics.annualBilling.paid)}</p>
+                        <p className="text-xs font-bold uppercase tracking-wider text-white/70 mt-2 mb-1">Pendiente:</p>
+                        <p className="text-lg font-bold text-amber-300">{currencyFormatter.format(metrics.annualBilling.total - metrics.annualBilling.paid)}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Gastos del Mes */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                        <Receipt className="text-red-500" size={20} />
+                        GASTOS DEL MES
+                    </h3>
+                    <button
+                        onClick={() => setMode('gastos')}
+                        className="text-slate-400 hover:text-sky-600 transition-colors"
+                        title="Ver Gastos"
+                    >
+                        <ArrowRight size={20} />
+                    </button>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-4 bg-red-50 rounded-lg border border-red-100">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Gastos</p>
+                        <p className="text-2xl font-bold text-slate-800">RD$ {formatCurrency(metrics.expenses.totalMonth)}</p>
+                        <p className="text-sm text-red-500 font-medium">{metrics.expenses.count} registros</p>
+                    </div>
+                    <div className={`p-4 rounded-lg border ${metrics.expenses.netBalance >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Balance Neto (Mes)</p>
+                        <p className="text-2xl font-bold text-slate-800">
+                            RD$ {formatCurrency(Math.abs(metrics.expenses.netBalance))}
+                        </p>
+                        <p className={`text-sm font-medium ${metrics.expenses.netBalance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {metrics.expenses.netBalance >= 0 ? 'Ganancia' : 'Pérdida'}
+                        </p>
+                    </div>
+                    {metrics.expenses.byCategory.slice(0, 2).map(({ category, total }) => (
+                        <div key={category} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{category}</p>
+                            <p className="text-xl font-bold text-slate-800">RD$ {formatCurrency(total)}</p>
+                        </div>
+                    ))}
+                </div>
+                {metrics.expenses.byCategory.length > 2 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        {metrics.expenses.byCategory.slice(2).map(({ category, total }) => (
+                            <span key={category} className="px-3 py-1 bg-slate-100 rounded-md text-sm text-slate-600">
+                                {category}: RD$ {formatCurrency(total)}
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Órdenes Atrasadas (SLA) */}
+            {metrics.overdueOrders.length > 0 && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-red-200 bg-red-50/30">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-red-700 flex items-center gap-2">
+                            <Clock className="text-red-500" size={20} />
+                            ÓRDENES ATRASADAS ({metrics.overdueOrders.length})
+                            <span className="text-xs font-normal text-red-500 ml-2">SLA: 24 horas</span>
+                        </h3>
+                        <button
+                            onClick={() => setMode('calendar')}
+                            className="text-red-400 hover:text-red-600 transition-colors"
+                            title="Ver Órdenes"
+                        >
+                            <ArrowRight size={20} />
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {metrics.overdueOrders.slice(0, 8).map(order => (
+                            <div key={order.id} className="p-4 bg-white border border-red-200 rounded-lg shadow-sm">
+                                <div className="flex items-start justify-between mb-2">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{order.orderNumber}</p>
+                                        <p className="text-base font-bold text-slate-800 truncate">{order.customerName}</p>
+                                    </div>
+                                    <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-medium ${
+                                        order.status === 'Pendiente' ? 'bg-amber-100 text-amber-700' :
+                                        order.status === 'En Proceso' ? 'bg-blue-100 text-blue-700' :
+                                        order.status === 'No Agendado' ? 'bg-slate-100 text-slate-600' :
+                                        'bg-slate-100 text-slate-600'
+                                    }`}>
+                                        {order.status}
+                                    </span>
+                                </div>
+                                <p className="text-sm text-slate-500 truncate mb-2">{order.applianceType}</p>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-slate-500 truncate">{order.technicianName}</span>
+                                    <span className="text-red-600 font-bold">
+                                        {order.daysSinceCreation > 0 ? `${order.daysSinceCreation}d` : `${order.hoursSinceCreation}h`} atraso
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {metrics.overdueOrders.length > 8 && (
+                        <p className="text-center text-sm text-red-500 mt-4">
+                            Y {metrics.overdueOrders.length - 8} órdenes más atrasadas...
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* Bottom Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -477,6 +812,222 @@ export const InicioView: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Critical Stock Section */}
+            {metrics.criticalStock.length > 0 && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 mt-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                            <AlertTriangle className="text-amber-500" size={20} />
+                            REPUESTOS CRÍTICOS (Stock Bajo)
+                        </h3>
+                        <button
+                            onClick={() => setMode('productos')}
+                            className="text-slate-400 hover:text-sky-600 transition-colors"
+                            title="Ver Productos"
+                        >
+                            <ArrowRight size={20} />
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {metrics.criticalStock.slice(0, 8).map(product => (
+                            <div key={product.id} className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-slate-800 text-sm truncate">{product.name}</p>
+                                        <p className="text-xs text-slate-500">{product.code}</p>
+                                    </div>
+                                    <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold ${
+                                        product.stock === 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                                    }`}>
+                                        {product.stock}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {metrics.criticalStock.length > 8 && (
+                        <p className="text-center text-sm text-slate-500 mt-4">
+                            Y {metrics.criticalStock.length - 8} productos más con stock bajo...
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {/* Estado de Casos por Técnico */}
+            {metrics.technicianStats.length > 0 && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 mt-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                            <Users className="text-indigo-500" size={20} />
+                            ESTADO DE CASOS POR TÉCNICO
+                        </h3>
+                        <button
+                            onClick={() => setMode('staff')}
+                            className="text-slate-400 hover:text-sky-600 transition-colors"
+                            title="Ver Personal"
+                        >
+                            <ArrowRight size={20} />
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {metrics.technicianStats.map(tech => (
+                            <div key={tech.id} className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                                <div className="flex items-center gap-3 mb-3">
+                                    {tech.photo ? (
+                                        <img
+                                            src={tech.photo}
+                                            alt={tech.name}
+                                            className="w-10 h-10 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                            <span className="text-indigo-600 font-bold text-sm">
+                                                {tech.name.charAt(0).toUpperCase()}
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-slate-800 text-sm truncate">{tech.name}</p>
+                                        <p className="text-xs text-slate-500">{tech.total} órdenes total</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="p-2 bg-amber-50 rounded">
+                                        <p className="text-lg font-bold text-amber-600">{tech.pending}</p>
+                                        <p className="text-[10px] text-amber-700">Pendiente</p>
+                                    </div>
+                                    <div className="p-2 bg-blue-50 rounded">
+                                        <p className="text-lg font-bold text-blue-600">{tech.inProgress}</p>
+                                        <p className="text-[10px] text-blue-700">En Proceso</p>
+                                    </div>
+                                    <div className="p-2 bg-green-50 rounded">
+                                        <p className="text-lg font-bold text-green-600">{tech.completed}</p>
+                                        <p className="text-[10px] text-green-700">Completado</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Rendimiento por Técnico (últimos 30 días) */}
+            {metrics.technicianPerformance.length > 0 && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 mt-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                            <TrendingUp className="text-emerald-500" size={20} />
+                            RENDIMIENTO POR TÉCNICO
+                            <span className="text-xs font-normal text-slate-400 ml-2">Últimos 30 días</span>
+                        </h3>
+                        <button
+                            onClick={() => setMode('staff')}
+                            className="text-slate-400 hover:text-sky-600 transition-colors"
+                            title="Ver Personal"
+                        >
+                            <ArrowRight size={20} />
+                        </button>
+                    </div>
+                    <div className="space-y-4">
+                        {metrics.technicianPerformance.map(tech => {
+                            return (
+                                <div key={tech.id} className="flex items-center gap-4">
+                                    {/* Avatar */}
+                                    {tech.photo ? (
+                                        <img
+                                            src={tech.photo}
+                                            alt={tech.name}
+                                            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                        />
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-emerald-600 font-bold text-sm">
+                                                {tech.name.charAt(0).toUpperCase()}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Name and stats */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="font-medium text-slate-700 text-sm truncate">{tech.name}</span>
+                                            <div className="flex items-center gap-3 text-xs text-slate-500 flex-shrink-0 ml-2">
+                                                <span>{tech.completed}/{tech.total} completadas</span>
+                                                <span className={`font-bold ${
+                                                    tech.completionRate >= 80 ? 'text-emerald-600' :
+                                                    tech.completionRate >= 50 ? 'text-amber-600' :
+                                                    'text-red-600'
+                                                }`}>
+                                                    {tech.completionRate}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {/* Progress bar */}
+                                        <div className="w-full bg-slate-100 rounded-full h-3">
+                                            <div
+                                                className={`h-3 rounded-full transition-all duration-500 ${
+                                                    tech.completionRate >= 80 ? 'bg-emerald-500' :
+                                                    tech.completionRate >= 50 ? 'bg-amber-500' :
+                                                    'bg-red-500'
+                                                }`}
+                                                style={{ width: `${tech.completionRate}%` }}
+                                            ></div>
+                                        </div>
+                                        {tech.revenue > 0 && (
+                                            <p className="text-xs text-slate-400 mt-1">
+                                                Facturado: {currencyFormatter.format(tech.revenue)}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Reparaciones por Tipo de Equipo */}
+            {metrics.repairsByEquipmentType.length > 0 && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 mt-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                            <Wrench className="text-sky-500" size={20} />
+                            REPARACIONES POR TIPO DE EQUIPO
+                        </h3>
+                        <button
+                            onClick={() => setMode('calendar')}
+                            className="text-slate-400 hover:text-sky-600 transition-colors"
+                            title="Ver Órdenes"
+                        >
+                            <ArrowRight size={20} />
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                        {metrics.repairsByEquipmentType.map((item, index) => {
+                            const maxCount = metrics.repairsByEquipmentType[0]?.count || 1;
+                            const intensity = Math.round((item.count / maxCount) * 100);
+                            const bgColor = index === 0 ? 'bg-sky-500' :
+                                          index === 1 ? 'bg-sky-400' :
+                                          index === 2 ? 'bg-sky-300' :
+                                          'bg-sky-200';
+                            const textColor = index < 3 ? 'text-white' : 'text-sky-800';
+
+                            return (
+                                <div
+                                    key={item.type}
+                                    className={`p-4 rounded-lg ${bgColor} ${textColor} text-center transition-transform hover:scale-105`}
+                                >
+                                    <p className="text-2xl font-bold">{item.count}</p>
+                                    <p className={`text-xs ${index < 3 ? 'text-white/80' : 'text-sky-600'} truncate`} title={item.type}>
+                                        {item.type}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
