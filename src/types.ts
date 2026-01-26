@@ -138,7 +138,7 @@ export interface WorkshopEquipment {
 // FIX: Add missing types for products, bank accounts, and invoicing.
 // --- PRODUCTOS MODULE TYPES ---
 export type ProductType = 'Inventario' | 'Manual';
-export type ProductStatus = 'Activo' | 'Inactivo' | 'Descontinuado';
+export type ProductStatus = 'Nuevo' | 'Usado' | 'Reacondicionado';
 
 export interface Product {
     id: string;

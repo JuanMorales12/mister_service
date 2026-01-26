@@ -22,11 +22,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
     const [brand, setBrand] = useState('');
     const [description, setDescription] = useState('');
     const [location, setLocation] = useState('');
-    const [status, setStatus] = useState<ProductStatus>('Activo');
+    const [status, setStatus] = useState<ProductStatus>('Nuevo');
     const [entryDate, setEntryDate] = useState('');
     const [lotOrSerial, setLotOrSerial] = useState('');
     const [supplier, setSupplier] = useState('');
     const [codeError, setCodeError] = useState<string | null>(null);
+    const [loadedProductId, setLoadedProductId] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -41,7 +42,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                 setBrand(productToEdit.brand || '');
                 setDescription(productToEdit.description || '');
                 setLocation(productToEdit.location || '');
-                setStatus(productToEdit.status || 'Activo');
+                setStatus(productToEdit.status || 'Nuevo');
                 setEntryDate(productToEdit.entryDate || '');
                 setLotOrSerial(productToEdit.lotOrSerial || '');
                 setSupplier(productToEdit.supplier || '');
@@ -56,16 +57,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                 setBrand('');
                 setDescription('');
                 setLocation('');
-                setStatus('Activo');
+                setStatus('Nuevo');
                 setEntryDate(new Date().toISOString().split('T')[0]);
                 setLotOrSerial('');
                 setSupplier('');
             }
             setCodeError(null);
+            setLoadedProductId(null);
         }
     }, [isOpen, productToEdit]);
 
-    // Validar código duplicado
+    // Validar código duplicado y ofrecer cargar producto existente
     const handleCodeChange = (newCode: string) => {
         setCode(newCode);
         if (newCode.trim()) {
@@ -80,6 +82,31 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
             }
         } else {
             setCodeError(null);
+        }
+    };
+
+    // Cargar datos del producto existente
+    const handleLoadExistingProduct = () => {
+        const existingProduct = products.find(p =>
+            p.code.toLowerCase() === code.toLowerCase() &&
+            p.id !== productToEdit?.id
+        );
+        if (existingProduct) {
+            setName(existingProduct.name);
+            setPurchasePrice(existingProduct.purchasePrice);
+            setSellPrice1(existingProduct.sellPrice1);
+            setSellPrice2(existingProduct.sellPrice2);
+            setSellPrice3(existingProduct.sellPrice3);
+            setStock(existingProduct.stock);
+            setBrand(existingProduct.brand || '');
+            setDescription(existingProduct.description || '');
+            setLocation(existingProduct.location || '');
+            setStatus(existingProduct.status || 'Nuevo');
+            setEntryDate(existingProduct.entryDate || new Date().toISOString().split('T')[0]);
+            setLotOrSerial(existingProduct.lotOrSerial || '');
+            setSupplier(existingProduct.supplier || '');
+            setCodeError(null);
+            setLoadedProductId(existingProduct.id);
         }
     };
 
@@ -98,17 +125,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
             sellPrice2,
             sellPrice3,
             stock,
-            brand: brand || undefined,
+            brand, // Campo obligatorio
             description: description || undefined,
             location: location || undefined,
             status,
-            entryDate: entryDate || undefined,
+            entryDate, // Campo obligatorio
             lotOrSerial: lotOrSerial || undefined,
             supplier: supplier || undefined,
         };
 
         if (productToEdit) {
             updateProduct(productToEdit.id, productData);
+        } else if (loadedProductId) {
+            // Si se cargó un producto existente, actualizarlo
+            updateProduct(loadedProductId, productData);
         } else {
             addProduct(productData);
         }
@@ -121,7 +151,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <header className="flex justify-between items-center p-4 border-b flex-shrink-0">
-                    <h2 className="text-xl font-bold text-slate-800">{productToEdit ? 'Editar Producto' : 'Nuevo Producto'}</h2>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">
+                            {productToEdit ? 'Editar Producto' : loadedProductId ? 'Editar Producto Existente' : 'Nuevo Producto'}
+                        </h2>
+                        {loadedProductId && !productToEdit && (
+                            <p className="text-xs text-sky-600">Editando producto cargado por código</p>
+                        )}
+                    </div>
                     <button type="button" onClick={onClose}><X size={20}/></button>
                 </header>
                 <main className="p-6 space-y-4 overflow-y-auto">
@@ -133,9 +170,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                                 <label className="label-style">Código *</label>
                                 <input type="text" value={code} onChange={e => handleCodeChange(e.target.value)} required className={`mt-1 input-style ${codeError ? 'border-red-500' : ''}`} placeholder="Ej: REF-001"/>
                                 {codeError && (
-                                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                                        <AlertCircle size={12}/> {codeError}
-                                    </p>
+                                    <div className="mt-1">
+                                        <p className="text-amber-600 text-xs flex items-center gap-1">
+                                            <AlertCircle size={12}/> {codeError}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleLoadExistingProduct}
+                                            className="mt-1 text-xs text-sky-600 hover:text-sky-800 underline"
+                                        >
+                                            Cargar datos del producto existente
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                             <div>
@@ -149,8 +195,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                                 <input type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1 input-style" placeholder="Ej: Compresor 1/4 HP"/>
                             </div>
                             <div>
-                                <label className="label-style">Marca</label>
-                                <input type="text" value={brand} onChange={e => setBrand(e.target.value)} className="mt-1 input-style" placeholder="Ej: Samsung"/>
+                                <label className="label-style">Marca *</label>
+                                <input type="text" value={brand} onChange={e => setBrand(e.target.value)} required className="mt-1 input-style" placeholder="Ej: Samsung"/>
                             </div>
                         </div>
                         <div className="mt-4">
@@ -187,16 +233,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                         <legend className="text-sm font-semibold px-2 text-slate-600">Información Adicional</legend>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="label-style">Estado</label>
-                                <select value={status} onChange={e => setStatus(e.target.value as ProductStatus)} className="mt-1 input-style">
-                                    <option value="Activo">Activo</option>
-                                    <option value="Inactivo">Inactivo</option>
-                                    <option value="Descontinuado">Descontinuado</option>
+                                <label className="label-style">Estado *</label>
+                                <select value={status} onChange={e => setStatus(e.target.value as ProductStatus)} required className="mt-1 input-style">
+                                    <option value="Nuevo">Nuevo</option>
+                                    <option value="Usado">Usado</option>
+                                    <option value="Reacondicionado">Reacondicionado</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="label-style">Fecha Ingreso</label>
-                                <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} className="mt-1 input-style"/>
+                                <label className="label-style">Fecha Ingreso *</label>
+                                <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} required className="mt-1 input-style"/>
                             </div>
                             <div>
                                 <label className="label-style">Ubicación</label>
