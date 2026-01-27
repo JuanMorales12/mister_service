@@ -17,6 +17,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
+  const [rnc, setRnc] = useState('');
   const [latitude, setLatitude] = useState<number | undefined>();
   const [longitude, setLongitude] = useState<number | undefined>();
 
@@ -28,6 +29,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
         setPhone(customerToEdit.phone);
         setEmail(customerToEdit.email);
         setAddress(customerToEdit.address);
+        setRnc(customerToEdit.rnc || '');
         setLatitude(customerToEdit.latitude);
         setLongitude(customerToEdit.longitude);
     } else {
@@ -36,6 +38,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
         setPhone('');
         setEmail('');
         setAddress('');
+        setRnc('');
         setLatitude(undefined);
         setLongitude(undefined);
     }
@@ -53,7 +56,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
         alert("Por favor, completa los campos de nombre, teléfono y dirección.");
         return;
     }
-    onSave({ name, phone, email, address, latitude, longitude });
+    onSave({ name, phone, email, address, rnc: rnc || undefined, latitude, longitude });
   };
 
   if (!isOpen) return null;
@@ -78,9 +81,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
               <input type="tel" id="customerPhone" value={phone} onChange={e => setPhone(e.target.value)} required className="mt-1 input-style" placeholder="Ej: 18091234567" />
             </div>
           </div>
-          <div>
-            <label htmlFor="customerEmail" className="label-style"><b>Correo Electrónico (Opcional)</b></label>
-            <input type="email" id="customerEmail" value={email} onChange={e => setEmail(e.target.value)} className="mt-1 input-style" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="customerEmail" className="label-style"><b>Correo Electrónico (Opcional)</b></label>
+              <input type="email" id="customerEmail" value={email} onChange={e => setEmail(e.target.value)} className="mt-1 input-style" />
+            </div>
+            <div>
+              <label htmlFor="customerRnc" className="label-style"><b>RNC (Solo Persona Jurídica)</b></label>
+              <input type="text" id="customerRnc" value={rnc} onChange={e => setRnc(e.target.value)} className="mt-1 input-style" placeholder="Ej: 123-45678-9" />
+            </div>
           </div>
           <div>
             <label htmlFor="customerAddress" className="label-style"><b>Dirección</b></label>

@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from '../components/Header';
 import { Dashboard } from '../components/Dashboard';
-import { AppState, Staff, AppContext, AppMode, Calendar, GoogleAuthState, Customer, DailyAvailability, StaffRole, ServiceOrderStatus, MaintenanceSchedule, AppContextType, ActionLog, WorkshopEquipment, CompanyInfo, SyncedAppState, LocalAppState, Quote, Invoice, ServiceOrder, Product, BankAccount, PaymentDetails, InvoiceStatus } from './types';
+import { AppState, Staff, AppContext, AppMode, Calendar, GoogleAuthState, Customer, DailyAvailability, StaffRole, ServiceOrderStatus, MaintenanceSchedule, AppContextType, ActionLog, WorkshopEquipment, CompanyInfo, SyncedAppState, LocalAppState, Quote, Invoice, ServiceOrder, Product, BankAccount, PaymentDetails, InvoiceStatus, Expense } from './types';
 import { GoogleCalendarService } from '../services/googleCalendarService';
 import { EmailService } from '../services/emailService';
 import { GOOGLE_CLIENT_ID } from '../config';
@@ -68,6 +68,7 @@ const getInitialSyncedState = (): SyncedAppState => {
       bankAccounts: [],
       lastInvoiceNumber: 0,
       lastQuoteNumber: 0,
+      expenses: [],
     }
 }
 
@@ -127,8 +128,8 @@ const App: React.FC = () => {
         if (!localState || !syncedState) return;
         const user = localState.currentUser;
         if (user?.role === 'tecnico' && localState.mode === 'inicio') {
-                // Default to 'my-orders' for technicians
-                setLocalState(prev => prev ? { ...prev, mode: 'my-orders' } : null);
+                // Default to 'technician-calendar' for technicians
+                setLocalState(prev => prev ? { ...prev, mode: 'technician-calendar' } : null);
         }
     }, [localState?.currentUser, syncedState]);
 
@@ -156,7 +157,7 @@ const App: React.FC = () => {
         setSyncedState(newState);
 
         if (isInitialLoad) {
-            const initialMode: AppMode = currentUser?.role === 'tecnico' ? 'my-orders' : 'inicio';
+            const initialMode: AppMode = currentUser?.role === 'tecnico' ? 'technician-calendar' : 'inicio';
             setLocalState({
                 mode: initialMode,
                 googleAuth: { token: null, user: null },
@@ -1241,6 +1242,51 @@ const deleteBankAccount = async (accountId: string) => {
     }
 };
 
+// --- EXPENSES CRUD ---
+const addExpense = async (expenseData: Omit<Expense, 'id' | 'createdById' | 'createdAt'>) => {
+    if (!syncedState || !localState?.currentUser) return;
+    try {
+        const newExpense: Expense = {
+            ...expenseData,
+            id: crypto.randomUUID(),
+            createdById: localState.currentUser.id,
+            createdAt: new Date(),
+        };
+        await firebaseService.saveState({
+            ...syncedState,
+            expenses: [...(syncedState.expenses || []), newExpense]
+        });
+    } catch(e: any) {
+        setGlobalError(getErrorMessage(e));
+    }
+};
+
+const updateExpense = async (expenseId: string, expenseData: Omit<Expense, 'id' | 'createdById' | 'createdAt'>) => {
+    if (!syncedState) return;
+    try {
+        await firebaseService.saveState({
+            ...syncedState,
+            expenses: (syncedState.expenses || []).map(e =>
+                e.id === expenseId ? { ...e, ...expenseData } : e
+            )
+        });
+    } catch(e: any) {
+        setGlobalError(getErrorMessage(e));
+    }
+};
+
+const deleteExpense = async (expenseId: string) => {
+    if (!syncedState) return;
+    try {
+        await firebaseService.saveState({
+            ...syncedState,
+            expenses: (syncedState.expenses || []).filter(e => e.id !== expenseId)
+        });
+    } catch(e: any) {
+        setGlobalError(getErrorMessage(e));
+    }
+};
+
 const setDummy = (key: keyof LocalAppState) => (value: any) => setLocalState(prev => prev ? { ...prev, [key]: value } : null);
 
 const viewInvoice = (invoiceId: string) => {
@@ -1260,8 +1306,8 @@ const appContextValue: AppContextType | null = appState ? {
     goHome: () => {
         const role = localState?.currentUser?.role;
         if (role === 'tecnico') {
-            // If already in 'my-orders', force a refresh by setting mode to 'my-orders' again
-            setMode('my-orders');
+            // Technicians go to their calendar as home
+            setMode('technician-calendar');
         } else {
             setMode('inicio');
         }
@@ -1313,6 +1359,10 @@ const appContextValue: AppContextType | null = appState ? {
   addBankAccount,
   updateBankAccount,
   deleteBankAccount,
+  // EXPENSES
+  addExpense,
+  updateExpense,
+  deleteExpense,
   setOrderToConvertToInvoice: setDummy('orderToConvertToInvoice'),
   setQuoteToConvertToInvoice: setDummy('quoteToConvertToInvoice'),
   setInvoiceToEdit: setDummy('invoiceToEdit'),

@@ -73,7 +73,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
                         <>
                             <div>
                                 <label className="label-style">Efectivo Recibido</label>
-                                <input type="number" value={cashReceived} onChange={e => setCashReceived(parseFloat(e.target.value) || 0)} className="mt-1 input-style" />
+                                <input type="number" value={cashReceived || ''} onChange={e => setCashReceived(e.target.value === '' ? 0 : parseFloat(e.target.value))} className="mt-1 input-style" />
                             </div>
                             <div className="p-3 bg-sky-50 rounded-md text-center">
                                 <p className="text-sm text-sky-800">Devuelta</p>

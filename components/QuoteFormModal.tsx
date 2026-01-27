@@ -100,12 +100,8 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
     
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!customer) {
-            alert("Por favor, selecciona un cliente.");
-            return;
-        }
 
-        const quoteData = { customerId: customer.id, date, items, discount, status, isTaxable };
+        const quoteData = { customerId: customer?.id || '', date, items, discount, status, isTaxable };
         
         if (quoteToEdit) {
             updateQuote(quoteToEdit.id, quoteData);
@@ -162,19 +158,16 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                                         <input type="date" value={date.toISOString().split('T')[0]} onChange={e => setDate(new Date(e.target.value))} className="mt-1 input-style"/>
                                     </div>
                                     <div>
-                                        <label htmlFor="discount-percent-quote" className="label-style">Descuento</label>
-                                        <div className="relative mt-1">
-                                            <input 
-                                                type="number" 
-                                                id="discount-percent-quote" 
-                                                value={discount} 
-                                                onChange={e => setDiscount(parseFloat(e.target.value) || 0)} 
-                                                onFocus={e => e.target.select()} 
-                                                className="input-style text-right pr-7" 
-                                                min="0" max="100" step="any"
-                                            />
-                                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
-                                        </div>
+                                        <label htmlFor="discount-percent-quote" className="label-style">Descuento (%)</label>
+                                        <input
+                                            type="number"
+                                            id="discount-percent-quote"
+                                            value={discount || ''}
+                                            onChange={e => setDiscount(e.target.value === '' ? 0 : parseFloat(e.target.value))}
+                                            onFocus={e => e.target.select()}
+                                            className="mt-1 input-style text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            min="0" max="100" step="any"
+                                        />
                                     </div>
                                     <div>
                                         <label className="label-style">Estado</label>

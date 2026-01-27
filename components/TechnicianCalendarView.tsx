@@ -1,11 +1,11 @@
 
 import React, { useState, useContext, useMemo, useRef, useEffect } from 'react';
-import { AppContext, AppContextType, ServiceOrderStatus, ServiceOrder } from '../src/types';
+import { AppContext, AppContextType, ServiceOrderStatus, ServiceOrder, CalendarViewType } from '../src/types';
 import { ChevronLeft, ChevronRight, User, Calendar as CalendarIcon, ArrowLeft } from 'lucide-react';
 import { ServiceOrderDetailsModal } from './ServiceOrderDetailsModal';
 import { CreateAppointmentModal } from './CreateAppointmentModal';
 
-type ViewMode = 'day' | 'week' | 'month';
+type ViewMode = CalendarViewType;
 
 const statusColors: Record<ServiceOrderStatus, { bg: string; border: string; text: string; }> = {
     Pendiente: { bg: 'bg-amber-500', border: 'border-amber-700', text: 'text-white' },
@@ -21,7 +21,7 @@ export const TechnicianCalendarView: React.FC = () => {
     const { staff, serviceOrders, calendars, currentUser, setMode } = useContext(AppContext) as AppContextType;
 
     const [selectedTechId, setSelectedTechId] = useState<string>('');
-    const [viewMode, setViewMode] = useState<ViewMode>('week');
+    const [viewMode, setViewMode] = useState<ViewMode>('day'); // Por defecto 'day' para técnicos
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -29,12 +29,27 @@ export const TechnicianCalendarView: React.FC = () => {
     const datePickerRef = useRef<HTMLInputElement>(null);
 
     const canSelectTechnician = currentUser?.role === 'administrador' || currentUser?.role === 'secretaria';
+    const isAdmin = currentUser?.role === 'administrador' || currentUser?.role === 'coordinador';
 
     const assignableStaff = useMemo(() => staff.filter(s => {
         if (!['tecnico', 'coordinador', 'administrador'].includes(s.role)) return false;
         const cal = calendars.find(c => c.id === s.calendarId);
         return cal?.active;
     }), [staff, calendars]);
+
+    // Determinar las vistas permitidas para el usuario actual
+    const allowedViews = useMemo((): CalendarViewType[] => {
+        // Admin y coordinador siempre tienen acceso a todas las vistas
+        if (isAdmin) {
+            return ['day', 'week', 'month'];
+        }
+        // Para técnicos, verificar las vistas configuradas
+        if (currentUser?.allowedCalendarViews && currentUser.allowedCalendarViews.length > 0) {
+            return currentUser.allowedCalendarViews;
+        }
+        // Por defecto solo vista de día para técnicos
+        return ['day'];
+    }, [currentUser, isAdmin]);
 
     useEffect(() => {
         if (canSelectTechnician) {
@@ -47,6 +62,13 @@ export const TechnicianCalendarView: React.FC = () => {
             }
         }
     }, [canSelectTechnician, currentUser, assignableStaff, selectedTechId]);
+
+    // Asegurar que la vista actual esté permitida
+    useEffect(() => {
+        if (!allowedViews.includes(viewMode) && allowedViews.length > 0) {
+            setViewMode(allowedViews[0]);
+        }
+    }, [allowedViews, viewMode]);
 
     const displayedTechId = selectedTechId;
 
@@ -93,7 +115,7 @@ export const TechnicianCalendarView: React.FC = () => {
         if (!displayedTechId) return [];
         const tech = staff.find(t => t.id === displayedTechId);
         if (!tech) return [];
-        
+
         const techCalendar = calendars.find(c => c.userId === tech.id);
         if(!techCalendar) return [];
 
@@ -101,8 +123,38 @@ export const TechnicianCalendarView: React.FC = () => {
         rangeStart.setHours(0,0,0,0);
         const rangeEnd = new Date(dateRange[1]);
         rangeEnd.setHours(23,59,59,999);
-        
+
         return serviceOrders.filter(order => order.calendarId === techCalendar.id && order.start && new Date(order.start) >= rangeStart && new Date(order.start) <= rangeEnd);
+    }, [displayedTechId, dateRange, serviceOrders, staff, calendars]);
+
+    // Estadísticas de casos por técnico
+    const technicianStats = useMemo(() => {
+        if (!displayedTechId) return { pending: 0, inProgress: 0, completed: 0, total: 0 };
+        const tech = staff.find(t => t.id === displayedTechId);
+        if (!tech) return { pending: 0, inProgress: 0, completed: 0, total: 0 };
+
+        const techCalendar = calendars.find(c => c.userId === tech.id);
+        if(!techCalendar) return { pending: 0, inProgress: 0, completed: 0, total: 0 };
+
+        const rangeStart = new Date(dateRange[0]);
+        rangeStart.setHours(0,0,0,0);
+        const rangeEnd = new Date(dateRange[1]);
+        rangeEnd.setHours(23,59,59,999);
+
+        const ordersInRange = serviceOrders.filter(order =>
+            order.calendarId === techCalendar.id &&
+            order.start &&
+            new Date(order.start) >= rangeStart &&
+            new Date(order.start) <= rangeEnd &&
+            order.status !== 'Cancelado'
+        );
+
+        return {
+            pending: ordersInRange.filter(o => o.status === 'Pendiente' || o.status === 'Por Confirmar').length,
+            inProgress: ordersInRange.filter(o => o.status === 'En Proceso').length,
+            completed: ordersInRange.filter(o => o.status === 'Completado').length,
+            total: ordersInRange.length
+        };
     }, [displayedTechId, dateRange, serviceOrders, staff, calendars]);
     
     const timeSlots = useMemo(() => {
@@ -200,6 +252,16 @@ export const TechnicianCalendarView: React.FC = () => {
                             <p className="text-sm text-slate-500">{currentUser?.name}</p>
                         </div>
                     )}
+                    {/* Estadísticas de casos */}
+                    {displayedTechId && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-md">
+                            <span className="text-xs font-medium text-slate-600">Casos:</span>
+                            <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700" title="Pendientes">{technicianStats.pending}</span>
+                            <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700" title="En Proceso">{technicianStats.inProgress}</span>
+                            <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-sky-100 text-sky-700" title="Completados">{technicianStats.completed}</span>
+                            <span className="text-xs font-semibold text-slate-700">= {technicianStats.total}</span>
+                        </div>
+                    )}
                     <div className="flex items-center gap-4">
                          <button onClick={handlePrev} className="p-2 rounded-full hover:bg-slate-100"><ChevronLeft size={20} /></button>
                          <button onClick={handleToday} className="px-4 py-2 text-sm font-medium border rounded-md hover:bg-slate-50">Hoy</button>
@@ -226,8 +288,12 @@ export const TechnicianCalendarView: React.FC = () => {
                         />
                     </div>
                     <div className="flex rounded-md shadow-sm">
-                        {(['day', 'week', 'month'] as ViewMode[]).map(mode => (
-                            <button key={mode} onClick={() => setViewMode(mode)} className={`px-3 py-2 text-sm font-medium border border-slate-300 capitalize ${viewMode === mode ? 'bg-sky-600 text-white border-sky-600' : 'bg-white hover:bg-slate-50'} first:rounded-l-md last:rounded-r-md`}>
+                        {allowedViews.map((mode, index) => (
+                            <button
+                                key={mode}
+                                onClick={() => setViewMode(mode)}
+                                className={`px-3 py-2 text-sm font-medium border border-slate-300 capitalize ${viewMode === mode ? 'bg-sky-600 text-white border-sky-600' : 'bg-white hover:bg-slate-50'} ${index === 0 ? 'rounded-l-md' : ''} ${index === allowedViews.length - 1 ? 'rounded-r-md' : ''}`}
+                            >
                                 {mode === 'day' ? 'Día' : mode === 'week' ? 'Semana' : 'Mes'}
                             </button>
                         ))}

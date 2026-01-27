@@ -1,26 +1,56 @@
 import React, { useState, useContext, useRef } from 'react';
-import { AppContext, AppContextType, CompanyInfo } from '../src/types';
-import { Building2, Save, Camera, CheckCircle, ArrowLeft } from 'lucide-react';
+import { AppContext, AppContextType, CompanyInfo, BankAccount } from '../src/types';
+import { Building2, Save, Camera, CheckCircle, ArrowLeft, Loader2, Landmark, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { firebaseService } from '../services/firebaseService';
+import { BankAccountFormModal } from './BankAccountFormModal';
 
 export const CompanySettingsView: React.FC = () => {
-    const { companyInfo, updateCompanyInfo, goHome } = useContext(AppContext) as AppContextType;
+    const { companyInfo, updateCompanyInfo, goHome, bankAccounts, deleteBankAccount } = useContext(AppContext) as AppContextType;
     const [formState, setFormState] = useState<CompanyInfo>(companyInfo);
     const [isSaved, setIsSaved] = useState(false);
+    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const logoInputRef = useRef<HTMLInputElement>(null);
+
+    // Bank accounts state
+    const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+    const [accountToEdit, setAccountToEdit] = useState<BankAccount | null>(null);
+
+    const handleOpenBankModal = (account: BankAccount | null = null) => {
+        setAccountToEdit(account);
+        setIsBankModalOpen(true);
+    };
+
+    const handleDeleteBankAccount = (accountId: string) => {
+        if (window.confirm('¿Estás seguro de que quieres eliminar esta cuenta bancaria?')) {
+            deleteBankAccount(accountId);
+        }
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormState(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormState(prev => ({ ...prev, logoUrl: reader.result as string }));
-            };
-            reader.readAsDataURL(file);
+            setIsUploadingLogo(true);
+            setUploadError(null);
+            try {
+                const logoUrl = await firebaseService.uploadFile(file, `company/logo-${Date.now()}`);
+                setFormState(prev => ({ ...prev, logoUrl }));
+            } catch (error: any) {
+                console.error('Error uploading logo:', error);
+                const errorMessage = error?.code === 'storage/unauthorized'
+                    ? 'No tienes permisos para subir archivos. Verifica la configuración de Firebase Storage.'
+                    : error?.code === 'storage/unknown' || error?.message?.includes('storage')
+                    ? 'Firebase Storage no está configurado. Por favor, activa el plan Blaze en Firebase Console.'
+                    : error?.message || 'Error al subir el logo. Por favor, intenta de nuevo.';
+                setUploadError(errorMessage);
+            } finally {
+                setIsUploadingLogo(false);
+            }
         }
     };
 
@@ -68,17 +98,27 @@ export const CompanySettingsView: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => logoInputRef.current?.click()}
-                                className="mt-3 text-sm text-sky-600 bg-white border border-sky-600 rounded-md px-4 py-1.5 hover:bg-sky-50"
+                                disabled={isUploadingLogo}
+                                className="mt-3 text-sm text-sky-600 bg-white border border-sky-600 rounded-md px-4 py-1.5 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
-                                Cambiar Logo
+                                {isUploadingLogo ? <><Loader2 size={14} className="animate-spin"/> Subiendo...</> : 'Cambiar Logo'}
                             </button>
+                            {uploadError && (
+                                <p className="mt-2 text-xs text-red-600 text-center max-w-[180px]">{uploadError}</p>
+                            )}
                         </div>
 
                         {/* Info Fields Section */}
                         <div className="md:col-span-2 space-y-4">
-                            <div>
-                                <label htmlFor="name" className="label-style">Nombre de la Empresa</label>
-                                <input type="text" id="name" name="name" value={formState.name} onChange={handleInputChange} required className="mt-1 input-style" />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="name" className="label-style">Nombre de la Empresa</label>
+                                    <input type="text" id="name" name="name" value={formState.name} onChange={handleInputChange} required className="mt-1 input-style" />
+                                </div>
+                                <div>
+                                    <label htmlFor="rnc" className="label-style">RNC</label>
+                                    <input type="text" id="rnc" name="rnc" value={formState.rnc || ''} onChange={handleInputChange} className="mt-1 input-style" placeholder="Ej: 123-45678-9" />
+                                </div>
                             </div>
                             <div>
                                 <label htmlFor="address" className="label-style">Dirección</label>
@@ -113,8 +153,55 @@ export const CompanySettingsView: React.FC = () => {
                         </button>
                     </div>
                 </form>
+
+                {/* Bank Accounts Section */}
+                <div className="mt-8 pt-8 border-t">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-bold text-slate-700 flex items-center gap-2">
+                            <Landmark className="text-sky-600" /> Cuentas Bancarias
+                        </h3>
+                        <button
+                            onClick={() => handleOpenBankModal(null)}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700"
+                        >
+                            <PlusCircle size={14} />
+                            <span>Agregar Cuenta</span>
+                        </button>
+                    </div>
+
+                    <div className="space-y-3">
+                        {bankAccounts.length > 0 ? (
+                            bankAccounts.map(account => (
+                                <div key={account.id} className="p-4 bg-slate-50 rounded-md border flex justify-between items-center">
+                                    <div>
+                                        <p className="font-semibold text-slate-800">{account.bankName}</p>
+                                        <p className="text-sm text-slate-600">{account.accountHolder}</p>
+                                        <p className="text-sm text-slate-500 font-mono">{account.accountNumber}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => handleOpenBankModal(account)} className="p-2 text-slate-500 hover:bg-slate-200 rounded-full" title="Editar">
+                                            <Edit size={16} />
+                                        </button>
+                                        <button onClick={() => handleDeleteBankAccount(account.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-full" title="Eliminar">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-center text-slate-500 py-4 bg-slate-50 rounded-md">No has registrado ninguna cuenta bancaria.</p>
+                        )}
+                    </div>
+                </div>
+
                 <style>{`.input-style { color: #0f172a; display: block; width: 100%; padding: 0.5rem 0.75rem; background-color: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; box-shadow: sm; placeholder-slate-400; focus:outline-none focus:ring-sky-500 focus:border-sky-500; } .label-style { display: block; font-medium; text-sm; color: #334155; }`}</style>
             </div>
+
+            <BankAccountFormModal
+                isOpen={isBankModalOpen}
+                onClose={() => setIsBankModalOpen(false)}
+                accountToEdit={accountToEdit}
+            />
         </div>
     );
 };

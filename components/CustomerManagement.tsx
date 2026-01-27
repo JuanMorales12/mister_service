@@ -100,12 +100,24 @@ export const CustomerManagement: React.FC = () => {
             alert("No hay clientes para exportar.");
             return;
         }
-        const dataStr = JSON.stringify(customers, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
+        // Exportar como CSV
+        const headers = ['Nombre', 'Teléfono', 'Email', 'Dirección', 'RNC'];
+        const csvRows = [
+            headers.join(','),
+            ...customers.map(c => [
+                `"${(c.name || '').replace(/"/g, '""')}"`,
+                `"${(c.phone || '').replace(/"/g, '""')}"`,
+                `"${(c.email || '').replace(/"/g, '""')}"`,
+                `"${(c.address || '').replace(/"/g, '""')}"`,
+                `"${(c.rnc || '').replace(/"/g, '""')}"`
+            ].join(','))
+        ];
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `misterservice_clientes_${new Date().toISOString().split('T')[0]}.json`;
+        link.download = `misterservice_clientes_${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

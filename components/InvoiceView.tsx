@@ -4,6 +4,7 @@ import React, { useState, useContext, useMemo } from 'react';
 import { AppContext, AppContextType, Invoice } from '../src/types';
 import { PlusCircle, Receipt, DollarSign, Search, Edit, Printer, Trash2, Copy, ArrowLeft } from 'lucide-react';
 import { RecordPaymentModal } from './RecordPaymentModal';
+import { formatCurrency } from '../src/utils';
 
 export const InvoiceView: React.FC = () => {
     const context = useContext(AppContext);
@@ -108,7 +109,7 @@ export const InvoiceView: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <div className="text-right">
-                                        <p className="font-bold text-xl text-slate-800">RD$ {invoice.total.toFixed(2)}</p>
+                                        <p className="font-bold text-xl text-slate-800">RD$ {formatCurrency(invoice.total)}</p>
                                         <span className={`text-xs font-medium py-0.5 px-2 rounded-full ${statusClasses[invoice.status]}`}>{invoice.status}</span>
                                     </div>
                                     <div className="flex items-center flex-wrap justify-end gap-1">
@@ -144,10 +145,17 @@ export const InvoiceView: React.FC = () => {
                                             <Edit size={16} />
                                         </button>
                                         <button
-                                            onClick={() => deleteInvoice(invoice.id)}
-                                            className="p-2 text-red-500 bg-red-100 hover:bg-red-200 rounded-full disabled:text-slate-300 disabled:bg-slate-50 disabled:cursor-not-allowed"
+                                            onClick={() => {
+                                                const isPaid = invoice.status === 'Pagada';
+                                                const message = isPaid
+                                                    ? `Esta factura ya está PAGADA. Eliminarla afectará los registros financieros. ¿Estás seguro de que deseas eliminar la factura ${invoice.invoiceNumber}?`
+                                                    : `¿Estás seguro de que deseas eliminar la factura ${invoice.invoiceNumber}?`;
+                                                if (window.confirm(message)) {
+                                                    deleteInvoice(invoice.id);
+                                                }
+                                            }}
+                                            className="p-2 text-red-500 bg-red-100 hover:bg-red-200 rounded-full"
                                             title="Eliminar Factura"
-                                            disabled={invoice.status === 'Pagada' || invoice.status === 'Anulada'}
                                         >
                                             <Trash2 size={16}/>
                                         </button>

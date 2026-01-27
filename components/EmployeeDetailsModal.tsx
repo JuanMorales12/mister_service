@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { AppContext, AppContextType, Staff, StaffRole } from '../src/types';
-import { X, Save, Camera, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { AppContext, AppContextType, Staff, StaffRole, CalendarViewType } from '../src/types';
+import { X, Save, Camera, AlertCircle, CheckCircle, Loader2, Calendar } from 'lucide-react';
 
 interface EmployeeDetailsModalProps {
   isOpen: boolean;
@@ -22,22 +22,9 @@ const initialFormState: Omit<Staff, 'id' | 'calendarId' | 'accessKey'> = {
     startDate: '',
     tss: 0,
     afp: 0,
-    loans: 0,
-    workErrorDeduction: 0,
-    otherDeductions: 0,
-    discount: 0,
-    requiredHours: 0,
-    workedHours: 0,
-    overtimeValue: 0,
-    totalHoursValue: 0,
-    income: 0,
-    commission: 0,
-    isPayrollTaxable: 'Si',
-    commissionBase: 'Productos',
-    tssDeductionSchedule: '2. Quincena',
-    afpDeductionSchedule: '2. Quincena',
     idPhotoUrl: '',
-    employeePhotoUrl: ''
+    employeePhotoUrl: '',
+    allowedCalendarViews: ['day'] // Por defecto solo vista de día
 };
 
 // --- Sub-components defined outside the main component to prevent re-creation on re-render ---
@@ -174,6 +161,19 @@ export const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({ isOp
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleCalendarViewToggle = (view: CalendarViewType) => {
+    setFormState(prev => {
+      const currentViews = prev.allowedCalendarViews || ['day'];
+      if (currentViews.includes(view)) {
+        // No permitir quitar todas las vistas - mantener al menos una
+        if (currentViews.length === 1) return prev;
+        return { ...prev, allowedCalendarViews: currentViews.filter(v => v !== view) };
+      } else {
+        return { ...prev, allowedCalendarViews: [...currentViews, view] };
+      }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -361,39 +361,50 @@ export const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({ isOp
                             <InputField label="Telefono" name="personalPhone" value={formState.personalPhone} onChange={handleInputChange} readOnly={isReadOnly}/>
                             <InputField label="Celular" name="fleetPhone" value={formState.fleetPhone} onChange={handleInputChange} readOnly={isReadOnly}/>
                         </div>
-                        {/* Fila 4 */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="md:col-span-1">
-                                <SelectField label="Cargo" name="role" value={formState.role} onChange={handleInputChange} options={['administrador', 'coordinador', 'tecnico', 'secretaria']} readOnly={isReadOnly}/>
-                            </div>
+                        {/* Fila 4: Cargo y datos de nómina básicos */}
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <SelectField label="Cargo" name="role" value={formState.role} onChange={handleInputChange} options={['administrador', 'coordinador', 'tecnico', 'secretaria']} readOnly={isReadOnly}/>
                             <NumberField label="Salario" name="salary" value={formState.salary} onChange={handleNumberChange} readOnly={isReadOnly}/>
                             <InputField label="Fecha de Entrada" name="startDate" type="date" value={formState.startDate} onChange={handleInputChange} readOnly={isReadOnly}/>
                             <NumberField label="TSS" name="tss" value={formState.tss} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                        </div>
-                        {/* Fila 5 */}
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                             <NumberField label="AFP" name="afp" value={formState.afp} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                            <NumberField label="Prestamos" name="loans" value={formState.loans} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                            <NumberField label="Error lab." name="workErrorDeduction" value={formState.workErrorDeduction} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                            <NumberField label="Otros desc." name="otherDeductions" value={formState.otherDeductions} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                            <NumberField label="Descuento" name="discount" value={formState.discount} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                            <NumberField label="Horas Req." name="requiredHours" value={formState.requiredHours} onChange={handleNumberChange} readOnly={isReadOnly}/>
                         </div>
-                        {/* Fila 6 */}
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                            <NumberField label="Horas Trab." name="workedHours" value={formState.workedHours} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                            <NumberField label="Valor HE" name="overtimeValue" value={formState.overtimeValue} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                            <NumberField label="Valor HT" name="totalHoursValue" value={formState.totalHoursValue} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                            <NumberField label="Ingresos" name="income" value={formState.income} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                            <NumberField label="Comision" name="commission" value={formState.commission} onChange={handleNumberChange} readOnly={isReadOnly}/>
-                        </div>
-                        {/* Fila 7 */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <SelectField label="Cotizable en nomina" name="isPayrollTaxable" value={formState.isPayrollTaxable} onChange={handleInputChange} options={['Si', 'No']} readOnly={isReadOnly}/>
-                            <SelectField label="Base de comision" name="commissionBase" value={formState.commissionBase} onChange={handleInputChange} options={['Productos', 'Servicios', 'Ambos']} readOnly={isReadOnly}/>
-                            <SelectField label="Descuento TSS" name="tssDeductionSchedule" value={formState.tssDeductionSchedule} onChange={handleInputChange} options={['1. Quincena', '2. Quincena', 'Fin de Mes']} readOnly={isReadOnly}/>
-                            <SelectField label="Descuento AFP" name="afpDeductionSchedule" value={formState.afpDeductionSchedule} onChange={handleInputChange} options={['1. Quincena', '2. Quincena', 'Fin de Mes']} readOnly={isReadOnly}/>
-                        </div>
+                        {/* Configuración de Vistas del Calendario (solo para técnicos) */}
+                        {(formState.role === 'tecnico') && currentUser?.role === 'administrador' && (
+                            <div className="p-4 border rounded-md bg-sky-50 border-sky-200">
+                                <h3 className="text-sm font-semibold text-sky-800 mb-3 flex items-center gap-2">
+                                    <Calendar size={16} />
+                                    Vistas de Calendario Permitidas
+                                </h3>
+                                <p className="text-xs text-slate-600 mb-3">Selecciona las vistas del calendario a las que este técnico tendrá acceso. Debe haber al menos una vista seleccionada.</p>
+                                <div className="flex flex-wrap gap-3">
+                                    {([
+                                        { view: 'day' as CalendarViewType, label: 'Día', description: 'Vista de un solo día' },
+                                        { view: 'week' as CalendarViewType, label: 'Semana', description: 'Vista de semana completa' },
+                                        { view: 'month' as CalendarViewType, label: 'Mes', description: 'Vista mensual' }
+                                    ]).map(({ view, label, description }) => {
+                                        const isSelected = (formState.allowedCalendarViews || ['day']).includes(view);
+                                        return (
+                                            <button
+                                                key={view}
+                                                type="button"
+                                                onClick={() => !isReadOnly && handleCalendarViewToggle(view)}
+                                                disabled={isReadOnly}
+                                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex flex-col items-start ${
+                                                    isSelected
+                                                        ? 'bg-sky-600 text-white'
+                                                        : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'
+                                                } ${isReadOnly ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                                                title={description}
+                                            >
+                                                <span>{label}</span>
+                                                <span className={`text-xs ${isSelected ? 'text-sky-100' : 'text-slate-400'}`}>{description}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <div className="lg:col-span-1 space-y-6">
                         <PhotoUpload label="Foto Empleado" field="employeePhotoUrl" value={formState.employeePhotoUrl} onChange={(e) => handleFileChange(e, 'employeePhotoUrl')} readOnly={isReadOnly}/>

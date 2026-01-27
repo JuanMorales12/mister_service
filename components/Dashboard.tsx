@@ -24,6 +24,7 @@ import { InvoicePrintView } from './InvoicePrintView';
 import { QuoteView } from './QuoteView';
 import { BankAccountManagement } from './BankAccountManagement';
 import { ProductManagement } from './ProductManagement';
+import { ExpenseManagement } from './ExpenseManagement';
 
 export const Dashboard: React.FC = () => {
   const { mode, invoiceToPrint, currentUser } = useContext(AppContext) as AppContextType;
@@ -51,6 +52,7 @@ export const Dashboard: React.FC = () => {
       {mode === 'cotizaciones' && <QuoteView />}
       {mode === 'productos' && <ProductManagement />}
       {mode === 'cuentas-bancarias' && <BankAccountManagement />}
+      {mode === 'gastos' && <ExpenseManagement />}
       {invoiceToPrint && <InvoicePrintView />}
       <Chatbot />
     </div>
