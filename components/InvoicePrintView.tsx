@@ -28,7 +28,7 @@ export const InvoicePrintView: React.FC = () => {
     const handleShare = async () => {
         const shareData = {
             title: `Factura ${invoice.invoiceNumber}`,
-            text: `Aquí está tu factura de Mister Service RD por un total de RD$ ${invoice.total.toFixed(2)}.`,
+            text: `Aquí está tu factura de Mister Service RD por un total de RD$ ${formatCurrency(invoice.total)}.`,
         };
         try {
             if (navigator.share) {

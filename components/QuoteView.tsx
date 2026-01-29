@@ -241,7 +241,7 @@ _Gracias por su preferencia_`;
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <div className="text-right">
-                                            <p className="font-bold text-xl text-slate-800">RD$ {quote.total.toFixed(2)}</p>
+                                            <p className="font-bold text-xl text-slate-800">RD$ {formatCurrency(quote.total)}</p>
                                              <select value={quote.status} onChange={(e) => handleChangeStatus(quote, e.target.value as Quote['status'])} disabled={processingQuoteId === quote.id} className={`mt-1 text-xs font-medium py-0.5 px-2 rounded-full border-0 focus:ring-0 ${statusClasses[quote.status]} ${processingQuoteId === quote.id ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                                 <option value="Borrador">Borrador</option>
                                                 <option value="Enviada">Enviada</option>

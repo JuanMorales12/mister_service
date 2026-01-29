@@ -10,9 +10,10 @@ interface CustomerFormModalProps {
   onClose: () => void;
   onSave: (customer: Omit<Customer, 'id' | 'serviceHistory'>) => void;
   customerToEdit?: Customer | null;
+  initialName?: string;
 }
 
-export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, onClose, onSave, customerToEdit }) => {
+export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, onClose, onSave, customerToEdit, initialName }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -33,9 +34,9 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
         setAddress(customerToEdit.address);
         setLatitude(customerToEdit.latitude);
         setLongitude(customerToEdit.longitude);
-    } else {
-        // Reset form when modal opens for creation or is closed
-        setName('');
+    } else if (isOpen) {
+        // Reset form when modal opens for creation
+        setName(initialName || '');
         setPhone('');
         setEmail('');
         setAddress('');
@@ -43,7 +44,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, on
         setLongitude(undefined);
         setLocationError('');
     }
-  }, [isOpen, customerToEdit]);
+  }, [isOpen, customerToEdit, initialName]);
 
   const handleGetLocation = () => {
     setIsLocating(true);
