@@ -144,7 +144,11 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                                         <input
                                             type="text"
                                             value={customerSearchQuery}
-                                            onChange={(e) => { setCustomerSearchQuery(e.target.value); setCustomer(null); }}
+                                            onChange={(e) => {
+                                                setCustomerSearchQuery(e.target.value);
+                                                setCustomer(null);
+                                                setIsSearchFocused(true);
+                                            }}
                                             onFocus={() => setIsSearchFocused(true)}
                                             onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                                             placeholder="Buscar cliente..."
@@ -182,9 +186,21 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                                     </div>
                                     {customer && (
                                         <div className="p-3 bg-slate-50 border rounded-md text-sm text-slate-600">
-                                            <p className="font-semibold text-slate-800 flex items-center gap-2"><User size={14}/> {customer.name}</p>
-                                            <p><strong>Tel:</strong> {customer.phone}</p>
-                                            <p><strong>Dir:</strong> {customer.address}</p>
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="font-semibold text-slate-800 flex items-center gap-2"><User size={14}/> {customer.name}</p>
+                                                    <p><strong>Tel:</strong> {customer.phone}</p>
+                                                    <p><strong>Dir:</strong> {customer.address}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setCustomer(null); setCustomerSearchQuery(''); }}
+                                                    className="text-slate-400 hover:text-red-500"
+                                                    title="Cambiar cliente"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>

@@ -27,6 +27,9 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
     const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
 
+    // Detect mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 
     // Effect to stop camera stream when modal is closed or on component unmount
     useEffect(() => {
@@ -265,7 +268,13 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
                         <div>
                             <label className="label-style">Foto de Prueba (Obligatorio)</label>
                             <div className="mt-2 flex flex-col items-center p-4 border-2 border-dashed border-slate-300 rounded-lg min-h-[200px] justify-center">
-                                {photoPreview ? (
+                                {!isMobile ? (
+                                    <div className="text-center p-4">
+                                        <AlertCircle size={40} className="mx-auto text-amber-500 mb-3"/>
+                                        <p className="text-amber-700 font-medium">Función disponible solo en dispositivos móviles</p>
+                                        <p className="text-sm text-slate-500 mt-2">Para completar esta orden, debe usar su teléfono o tablet para capturar la foto del servicio.</p>
+                                    </div>
+                                ) : photoPreview ? (
                                     <>
                                         <img src={photoPreview} alt="Vista previa" className="max-h-48 rounded-md mb-4"/>
                                         <label htmlFor="camera-input" className="cursor-pointer text-sm font-medium text-sky-600 bg-sky-100 rounded-md px-4 py-2 hover:bg-sky-200 flex items-center gap-2">
@@ -281,37 +290,39 @@ export const CompleteOrderModal: React.FC<CompleteOrderModalProps> = ({ isOpen, 
                                         </label>
                                     </div>
                                 )}
-                                <input
-                                    id="camera-input"
-                                    type="file"
-                                    accept="image/*"
-                                    capture="environment"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onload = (event) => {
-                                                const img = new Image();
-                                                img.onload = () => {
-                                                    const canvas = document.createElement('canvas');
-                                                    const MAX_WIDTH = 800;
-                                                    const scale = MAX_WIDTH / img.width;
-                                                    canvas.width = MAX_WIDTH;
-                                                    canvas.height = img.height * scale;
-                                                    const ctx = canvas.getContext('2d');
-                                                    if (ctx) {
-                                                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                                                        setPhotoPreview(dataUrl);
-                                                    }
+                                {isMobile && (
+                                    <input
+                                        id="camera-input"
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onload = (event) => {
+                                                    const img = new Image();
+                                                    img.onload = () => {
+                                                        const canvas = document.createElement('canvas');
+                                                        const MAX_WIDTH = 800;
+                                                        const scale = MAX_WIDTH / img.width;
+                                                        canvas.width = MAX_WIDTH;
+                                                        canvas.height = img.height * scale;
+                                                        const ctx = canvas.getContext('2d');
+                                                        if (ctx) {
+                                                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                                                            setPhotoPreview(dataUrl);
+                                                        }
+                                                    };
+                                                    img.src = event.target?.result as string;
                                                 };
-                                                img.src = event.target?.result as string;
-                                            };
-                                            reader.readAsDataURL(file);
-                                        }
-                                    }}
-                                    className="hidden"
-                                />
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                        className="hidden"
+                                    />
+                                )}
                             </div>
                         </div>
                     </main>

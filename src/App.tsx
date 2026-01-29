@@ -168,6 +168,7 @@ const App: React.FC = () => {
                 invoiceToEdit: null,
                 invoiceToDuplicate: null,
                 invoiceToPrint: null,
+                quoteToPrint: null,
                 invoiceMode: null,
             });
             isInitialLoad = false;
@@ -1023,7 +1024,7 @@ const updateInvoice = async (invoiceId: string, invoiceData: Omit<Invoice, 'id' 
         const subtotalAfterDiscount = subtotal - discountAmount;
         const taxes = invoiceData.isTaxable ? subtotalAfterDiscount * 0.18 : 0;
         const total = subtotalAfterDiscount + taxes;
-        
+
         // Recalculate status based on total and paidAmount
         let newStatus = invoiceData.status;
         if (newStatus !== 'Anulada') {
@@ -1041,8 +1042,24 @@ const updateInvoice = async (invoiceId: string, invoiceData: Omit<Invoice, 'id' 
             status: newStatus
         };
 
+        // Si una factura pagada se anula, devolver stock a los productos
+        let updatedProducts = syncedState.products;
+        if (newStatus === 'Anulada' && original.status === 'Pagada') {
+            updatedProducts = syncedState.products.map(product => {
+                const invoiceItem = original.items.find(item => item.type === 'Inventario' && item.productId === product.id);
+                if (invoiceItem) {
+                    return {
+                        ...product,
+                        stock: product.stock + invoiceItem.quantity
+                    };
+                }
+                return product;
+            });
+        }
+
         await firebaseService.saveState({
             ...syncedState,
+            products: updatedProducts,
             invoices: syncedState.invoices.map(i => i.id === invoiceId ? updatedInvoice : i)
         });
     } catch(e: any) {
@@ -1070,6 +1087,7 @@ const recordInvoicePayment = async (invoiceId: string, paymentDetails: PaymentDe
 
         const newPaidAmount = invoice.paidAmount + paymentDetails.amount;
         let newStatus: InvoiceStatus = invoice.status;
+        const wasNotPaid = invoice.status !== 'Pagada';
         if (newPaidAmount >= invoice.total) newStatus = 'Pagada';
         else if (newPaidAmount > 0) newStatus = 'Pago Parcial';
 
@@ -1080,8 +1098,24 @@ const recordInvoicePayment = async (invoiceId: string, paymentDetails: PaymentDe
             status: newStatus
         };
 
+        // Si la factura pasa a "Pagada", descontar stock de productos de inventario
+        let updatedProducts = syncedState.products;
+        if (newStatus === 'Pagada' && wasNotPaid) {
+            updatedProducts = syncedState.products.map(product => {
+                const invoiceItem = invoice.items.find(item => item.type === 'Inventario' && item.productId === product.id);
+                if (invoiceItem) {
+                    return {
+                        ...product,
+                        stock: Math.max(0, product.stock - invoiceItem.quantity)
+                    };
+                }
+                return product;
+            });
+        }
+
         await firebaseService.saveState({
             ...syncedState,
+            products: updatedProducts,
             invoices: syncedState.invoices.map(i => i.id === invoiceId ? updatedInvoice : i)
         });
     } catch(e: any) {
@@ -1300,6 +1334,10 @@ const viewInvoice = (invoiceId: string) => {
     }
 };
 
+const setQuoteToPrint = (data: { quote: Quote, customer: Customer } | null) => {
+    setLocalState(prev => prev ? { ...prev, quoteToPrint: data } : null);
+};
+
 const appContextValue: AppContextType | null = appState ? {
   ...appState,
   setMode,
@@ -1368,6 +1406,7 @@ const appContextValue: AppContextType | null = appState ? {
   setInvoiceToEdit: setDummy('invoiceToEdit'),
   setInvoiceToDuplicate: setDummy('invoiceToDuplicate'),
   setInvoiceToPrint: setDummy('invoiceToPrint'),
+  setQuoteToPrint,
   viewInvoice,
 } : null;
 

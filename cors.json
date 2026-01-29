@@ -1,8 +1,1 @@
-[
-  {
-    "origin": ["http://localhost:3005", "http://localhost:3000", "http://localhost:5173", "https://mister-service-sistema-eb7de.web.app", "https://mister-service-sistema-eb7de.firebaseapp.com", "https://mister-service.vercel.app"],
-    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
-    "maxAgeSeconds": 3600,
-    "responseHeader": ["Content-Type", "Authorization", "Content-Length", "User-Agent", "x-goog-resumable"]
-  }
-]
+[{"origin": ["*"], "method": ["GET"], "maxAgeSeconds": 3600}]

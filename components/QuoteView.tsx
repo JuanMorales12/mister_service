@@ -1,12 +1,13 @@
 
 import React, { useState, useContext, useMemo } from 'react';
 import { AppContext, AppContextType, Quote } from '../src/types';
-import { PlusCircle, FileSpreadsheet, Search, Edit, Trash2, FileText, Wrench, User, ArrowLeft, CheckCircle, MessageCircle } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, Search, Edit, Trash2, FileText, Wrench, User, ArrowLeft, CheckCircle, Printer } from 'lucide-react';
+import { WhatsAppIcon } from './WhatsAppIcon';
 import { formatCurrency } from '../src/utils';
 import { QuoteFormModal } from './QuoteFormModal';
 
 export const QuoteView: React.FC = () => {
-    const { quotes, customers, staff, setQuoteToConvertToInvoice, goHome, setMode, deleteQuote, updateQuote, companyInfo } = useContext(AppContext) as AppContextType;
+    const { quotes, customers, staff, setQuoteToConvertToInvoice, goHome, setMode, deleteQuote, updateQuote, companyInfo, setQuoteToPrint, setGlobalError } = useContext(AppContext) as AppContextType;
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [quoteToEdit, setQuoteToEdit] = useState<Quote | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -64,8 +65,8 @@ export const QuoteView: React.FC = () => {
     };
 
     const getCustomerName = (customerId: string) => {
-        if (!customerId) return 'Sin cliente';
-        return customers.find(c => c.id === customerId)?.name || 'Cliente desconocido';
+        if (!customerId) return 'Cliente potencial';
+        return customers.find(c => c.id === customerId)?.name || 'Cliente potencial';
     };
     
     const statusClasses: Record<Quote['status'], string> = {
@@ -110,6 +111,21 @@ export const QuoteView: React.FC = () => {
     const handleQuickAccept = async (quote: Quote) => {
         if (quote.status === 'Aceptada') return;
         await handleChangeStatus(quote, 'Aceptada');
+    };
+
+    // Función para imprimir/PDF
+    const handlePrintQuote = (quote: Quote) => {
+        const customer = customers.find(c => c.id === quote.customerId);
+        // Si no hay cliente, crear uno temporal con "Cliente potencial"
+        const customerData = customer || {
+            id: '',
+            name: 'Cliente potencial',
+            phone: '',
+            email: '',
+            address: '',
+            serviceHistory: []
+        };
+        setQuoteToPrint({ quote, customer: customerData });
     };
 
     // Función para compartir por WhatsApp
@@ -261,11 +277,18 @@ _Gracias por su preferencia_`;
                                                 </button>
                                             )}
                                             <button
+                                                onClick={() => handlePrintQuote(quote)}
+                                                className="p-2 text-sky-600 bg-sky-100 hover:bg-sky-200 rounded-full"
+                                                title="Imprimir / PDF"
+                                            >
+                                                <Printer size={16} />
+                                            </button>
+                                            <button
                                                 onClick={() => handleShareWhatsApp(quote)}
                                                 className="p-2 text-emerald-600 bg-emerald-100 hover:bg-emerald-200 rounded-full"
                                                 title="Enviar por WhatsApp"
                                             >
-                                                <MessageCircle size={16} />
+                                                <WhatsAppIcon size={16} />
                                             </button>
                                             <button
                                                 onClick={() => handleConvertToInvoice(quote)}

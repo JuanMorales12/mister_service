@@ -104,14 +104,46 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({ isOpen, onCl
                                 <label className="label-style">Producto</label>
                                 <select value={selectedProductId} onChange={e => handleProductSelection(e.target.value)} className="mt-1 input-style">
                                     <option value="">Seleccionar producto</option>
-                                    {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    {products.map(p => <option key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</option>)}
                                 </select>
                             </div>
                             {selectedProductId && (
-                                <div>
-                                    <label className="label-style">Descripción</label>
-                                    <input type="text" readOnly value={description} className="mt-1 input-style"/>
-                                </div>
+                                <>
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex-1">
+                                            <label className="label-style">Descripción</label>
+                                            <input type="text" readOnly value={description} className="mt-1 input-style"/>
+                                        </div>
+                                        {(() => {
+                                            const product = products.find(p => p.id === selectedProductId);
+                                            if (product) {
+                                                const stockClass = product.stock <= 0 ? 'bg-red-100 text-red-800' :
+                                                                   product.stock <= 5 ? 'bg-amber-100 text-amber-800' :
+                                                                   'bg-green-100 text-green-800';
+                                                return (
+                                                    <div className="text-center">
+                                                        <label className="label-style">Stock</label>
+                                                        <div className={`mt-1 px-3 py-2 rounded-md font-bold ${stockClass}`}>
+                                                            {product.stock}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+                                    </div>
+                                    {(() => {
+                                        const product = products.find(p => p.id === selectedProductId);
+                                        if (product && quantity > product.stock) {
+                                            return (
+                                                <p className="text-red-600 text-sm font-medium">
+                                                    ⚠️ La cantidad solicitada ({quantity}) excede el stock disponible ({product.stock})
+                                                </p>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </>
                             )}
                         </>
                     ) : (

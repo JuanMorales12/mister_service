@@ -524,7 +524,7 @@ export const InicioView: React.FC = () => {
                      <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ÓRDENES ACTIVAS</p>
-                            <h3 className="text-2xl font-bold text-slate-800 mt-1">{currencyFormatter.format(metrics.orders.total)}</h3>
+                            <h3 className="text-2xl font-bold text-slate-800 mt-1">{metrics.orders.pending}</h3>
                         </div>
                         <button
                             onClick={() => setMode('calendar')}
@@ -644,7 +644,7 @@ export const InicioView: React.FC = () => {
                         <ArrowRight size={20} />
                     </button>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-red-50 rounded-lg border border-red-100">
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Gastos</p>
                         <p className="text-2xl font-bold text-slate-800">RD$ {formatCurrency(metrics.expenses.totalMonth)}</p>
@@ -659,22 +659,7 @@ export const InicioView: React.FC = () => {
                             {metrics.expenses.netBalance >= 0 ? 'Ganancia' : 'Pérdida'}
                         </p>
                     </div>
-                    {metrics.expenses.byCategory.slice(0, 2).map(({ category, total }) => (
-                        <div key={category} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{category}</p>
-                            <p className="text-xl font-bold text-slate-800">RD$ {formatCurrency(total)}</p>
-                        </div>
-                    ))}
                 </div>
-                {metrics.expenses.byCategory.length > 2 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        {metrics.expenses.byCategory.slice(2).map(({ category, total }) => (
-                            <span key={category} className="px-3 py-1 bg-slate-100 rounded-md text-sm text-slate-600">
-                                {category}: RD$ {formatCurrency(total)}
-                            </span>
-                        ))}
-                    </div>
-                )}
             </div>
 
             {/* Órdenes Atrasadas (SLA) */}

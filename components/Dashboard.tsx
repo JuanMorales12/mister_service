@@ -21,13 +21,14 @@ import { InicioView } from './InicioView';
 import { InvoiceView } from './InvoiceView';
 import { InvoiceFormModal } from './InvoiceFormModal';
 import { InvoicePrintView } from './InvoicePrintView';
+import { QuotePrintView } from './QuotePrintView';
 import { QuoteView } from './QuoteView';
 import { BankAccountManagement } from './BankAccountManagement';
 import { ProductManagement } from './ProductManagement';
 import { ExpenseManagement } from './ExpenseManagement';
 
 export const Dashboard: React.FC = () => {
-  const { mode, invoiceToPrint, currentUser } = useContext(AppContext) as AppContextType;
+  const { mode, invoiceToPrint, quoteToPrint, currentUser } = useContext(AppContext) as AppContextType;
   
   return (
     <div className="relative">
@@ -54,6 +55,7 @@ export const Dashboard: React.FC = () => {
       {mode === 'cuentas-bancarias' && <BankAccountManagement />}
       {mode === 'gastos' && <ExpenseManagement />}
       {invoiceToPrint && <InvoicePrintView />}
+      {quoteToPrint && <QuotePrintView />}
       <Chatbot />
     </div>
   );
