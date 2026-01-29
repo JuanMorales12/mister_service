@@ -6,32 +6,30 @@ import { formatCurrency } from '../src/utils';
 import { generatePDF } from '../src/pdfGenerator';
 import { firebaseService } from '../services/firebaseService';
 
-export const InvoicePrintView: React.FC = () => {
-    const { invoiceToPrint, setInvoiceToPrint, companyInfo, setGlobalError } = useContext(AppContext) as AppContextType;
+export const QuotePrintView: React.FC = () => {
+    const { quoteToPrint, setQuoteToPrint, companyInfo, setGlobalError } = useContext(AppContext) as AppContextType;
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-    if (!invoiceToPrint) return null;
+    if (!quoteToPrint) return null;
 
-    const { invoice, customer } = invoiceToPrint;
-    const balanceDue = invoice.total - invoice.paidAmount;
+    const { quote, customer } = quoteToPrint;
 
     const handlePrint = () => {
         window.print();
-        // Detectar cuando se cierra el diálogo de impresión
         const afterPrint = () => {
             const shouldClose = window.confirm('¿Deseas cerrar la vista de impresión?');
             if (shouldClose) {
-                setInvoiceToPrint(null);
+                setQuoteToPrint(null);
             }
             window.removeEventListener('afterprint', afterPrint);
         };
         window.addEventListener('afterprint', afterPrint);
     };
-    
+
     const handleShare = async () => {
         const shareData = {
-            title: `Factura ${invoice.invoiceNumber}`,
-            text: `Aquí está tu factura de Mister Service RD por un total de RD$ ${formatCurrency(invoice.total)}.`,
+            title: `Cotización ${quote.quoteNumber}`,
+            text: `Aquí está tu cotización de ${companyInfo.name} por un total de RD$ ${formatCurrency(quote.total)}.`,
         };
         try {
             if (navigator.share) {
@@ -50,25 +48,27 @@ export const InvoicePrintView: React.FC = () => {
         setIsGeneratingPdf(true);
         try {
             // 1. Generar PDF
-            const pdfBlob = await generatePDF('invoice-print-content', `factura-${invoice.invoiceNumber}`);
+            const pdfBlob = await generatePDF('quote-print-content', `cotizacion-${quote.quoteNumber}`);
 
             // 2. Subir a Firebase Storage
-            const file = new File([pdfBlob], `factura-${invoice.invoiceNumber}-${Date.now()}.pdf`, { type: 'application/pdf' });
-            const pdfUrl = await firebaseService.uploadFile(file, `invoices/${invoice.invoiceNumber}-${Date.now()}.pdf`);
+            const file = new File([pdfBlob], `cotizacion-${quote.quoteNumber}-${Date.now()}.pdf`, { type: 'application/pdf' });
+            const pdfUrl = await firebaseService.uploadFile(file, `quotes/${quote.quoteNumber}-${Date.now()}.pdf`);
 
             // 3. Construir mensaje con link
-            const balanceDueAmount = invoice.total - invoice.paidAmount;
+            const validUntil = new Date(quote.date);
+            validUntil.setDate(validUntil.getDate() + 15);
+
             const message = `*${companyInfo.name}*
 ━━━━━━━━━━━━━━━━━
-*FACTURA #${invoice.invoiceNumber}*
-Fecha: ${new Date(invoice.date).toLocaleDateString('es-ES')}
+*COTIZACIÓN #${quote.quoteNumber}*
+Fecha: ${new Date(quote.date).toLocaleDateString('es-ES')}
+Válida hasta: ${validUntil.toLocaleDateString('es-ES')}
 ━━━━━━━━━━━━━━━━━
 
 *Cliente:* ${customer.name}
-*Total:* RD$ ${formatCurrency(invoice.total)}
-${balanceDueAmount > 0 ? `*Balance Pendiente:* RD$ ${formatCurrency(balanceDueAmount)}` : '✅ *PAGADO*'}
+*Total:* RD$ ${formatCurrency(quote.total)}
 
-📄 *Ver/Descargar Factura PDF:*
+📄 *Ver/Descargar Cotización PDF:*
 ${pdfUrl}
 
 ━━━━━━━━━━━━━━━━━
@@ -93,10 +93,14 @@ _Gracias por su preferencia_`;
         }
     };
 
+    // Calcular fecha de validez (15 días)
+    const validUntil = new Date(quote.date);
+    validUntil.setDate(validUntil.getDate() + 15);
+
     return (
         <div className="fixed inset-0 z-[9999] print-container">
             <div className="fixed top-4 right-4 flex flex-col gap-2 no-print z-[10000]">
-                 <button onClick={() => setInvoiceToPrint(null)} className="p-3 bg-white rounded-full shadow-lg text-slate-700 hover:bg-slate-100">
+                 <button onClick={() => setQuoteToPrint(null)} className="p-3 bg-white rounded-full shadow-lg text-slate-700 hover:bg-slate-100">
                     <X size={20}/>
                 </button>
                 <button onClick={handlePrint} className="p-3 bg-sky-600 text-white rounded-full shadow-lg hover:bg-sky-700">
@@ -114,7 +118,7 @@ _Gracias por su preferencia_`;
                     {isGeneratingPdf ? <Loader2 size={20} className="animate-spin"/> : <WhatsAppIcon size={20}/>}
                 </button>
             </div>
-            <div id="invoice-print-content" className="A4-sheet">
+            <div id="quote-print-content" className="A4-sheet">
                 {/* Header */}
                 <header className="flex justify-between items-start pb-4 border-b-2 border-slate-700">
                     <div>
@@ -127,35 +131,28 @@ _Gracias por su preferencia_`;
                         {companyInfo.logoUrl && (
                             <img src={companyInfo.logoUrl} alt="Company Logo" className="h-24 w-24 object-contain mb-2" />
                         )}
-                        <h2 className="text-4xl font-bold text-sky-600">FACTURA</h2>
-                        <p className="mt-2"><b>Fecha:</b> {new Date(invoice.date).toLocaleDateString('es-ES')}</p>
+                        <h2 className="text-4xl font-bold text-amber-600">COTIZACIÓN</h2>
+                        <p className="mt-2"><b>Fecha:</b> {new Date(quote.date).toLocaleDateString('es-ES')}</p>
                     </div>
                 </header>
-                
-                {/* Customer and Invoice Details */}
+
+                {/* Customer and Quote Details */}
                  <section className="my-6 grid grid-cols-2 gap-4">
                     <div className="p-3 border rounded-md bg-slate-50">
-                        <h3 className="font-semibold text-slate-700">Facturar a:</h3>
+                        <h3 className="font-semibold text-slate-700">Cliente:</h3>
                         <p className="font-bold">{customer.name}</p>
                         <p>Tel: {customer.phone}</p>
                         {customer.email && <p>Email: {customer.email}</p>}
                         {customer.rnc && <p>RNC: {customer.rnc}</p>}
                     </div>
                      <div className="p-3 border rounded-md bg-slate-50 text-right">
-                         <p><b>Factura No.:</b> <span className="font-mono">{invoice.invoiceNumber}</span></p>
+                         <p><b>Cotización No.:</b> <span className="font-mono">{quote.quoteNumber}</span></p>
                          {companyInfo.rnc && <p><b>RNC:</b> <span className="font-mono">{companyInfo.rnc}</span></p>}
-                         <p><b>Estado:</b> {invoice.status}</p>
+                         <p><b>Estado:</b> {quote.status}</p>
+                         <p className="text-amber-600 font-semibold"><b>Válida hasta:</b> {validUntil.toLocaleDateString('es-ES')}</p>
                     </div>
                 </section>
 
-                {/* Service Description */}
-                {invoice.serviceOrderDescription && (
-                    <section className="mb-6 p-3 border rounded-md bg-slate-50">
-                        <h3 className="font-semibold text-slate-700">Descripción del Servicio / Falla Reportada:</h3>
-                        <p className="text-sm whitespace-pre-wrap">{invoice.serviceOrderDescription}</p>
-                    </section>
-                )}
-                
                 {/* Items Table */}
                 <section>
                     <table className="w-full text-sm">
@@ -168,7 +165,7 @@ _Gracias por su preferencia_`;
                             </tr>
                         </thead>
                         <tbody>
-                            {invoice.items.map(item => (
+                            {quote.items.map(item => (
                                 <tr key={item.id} className="border-b">
                                     <td className="p-2">{item.quantity}</td>
                                     <td className="p-2">{item.description}</td>
@@ -183,27 +180,30 @@ _Gracias por su preferencia_`;
                 {/* Totals */}
                 <section className="mt-6 flex justify-end">
                     <div className="w-64 space-y-2 text-sm">
-                        <div className="flex justify-between"><span>Subtotal:</span> <span>RD$ {formatCurrency(invoice.subtotal)}</span></div>
-                        {invoice.discount > 0 && (
-                            <div className="flex justify-between"><span>Descuento:</span> <span>- RD$ {formatCurrency(invoice.discount)}</span></div>
+                        <div className="flex justify-between"><span>Subtotal:</span> <span>RD$ {formatCurrency(quote.subtotal)}</span></div>
+                        {quote.discount > 0 && (
+                            <div className="flex justify-between"><span>Descuento:</span> <span>- RD$ {formatCurrency(quote.discount)}</span></div>
                         )}
-                        <div className="flex justify-between"><span>ITBIS ({invoice.isTaxable ? '18%' : '0%'}):</span> <span>RD$ {formatCurrency(invoice.taxes)}</span></div>
+                        <div className="flex justify-between"><span>ITBIS ({quote.isTaxable ? '18%' : '0%'}):</span> <span>RD$ {formatCurrency(quote.taxes)}</span></div>
                         <div className="flex justify-between text-lg font-bold border-t-2 border-slate-700 mt-2 pt-2">
                             <span>Total General:</span>
-                            <span>RD$ {formatCurrency(invoice.total)}</span>
-                        </div>
-                        <div className="flex justify-between text-slate-600"><span>Total Pagado:</span> <span>RD$ {formatCurrency(invoice.paidAmount)}</span></div>
-                        <div className={`flex justify-between font-bold ${balanceDue > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            <span>Balance:</span>
-                            <span>RD$ {formatCurrency(balanceDue)}</span>
+                            <span>RD$ {formatCurrency(quote.total)}</span>
                         </div>
                     </div>
                 </section>
 
+                {/* Validity Note */}
+                <section className="mt-6 p-3 border rounded-md bg-amber-50 border-amber-200">
+                    <p className="text-sm text-amber-800">
+                        <b>Nota:</b> Esta cotización tiene una validez de 15 días a partir de la fecha de emisión.
+                        Los precios están sujetos a cambios después de este período.
+                    </p>
+                </section>
+
                 {/* Footer */}
                 <footer className="mt-auto pt-8 text-center text-xs text-slate-500 border-t">
-                    <p>Gracias por su compra.</p>
-                    <p>Original: Cliente / Copia: Vendedor</p>
+                    <p>Gracias por su preferencia.</p>
+                    <p>Esta cotización no representa un compromiso de venta.</p>
                 </footer>
             </div>
             <style>{`

@@ -308,6 +308,7 @@ export interface LocalAppState {
   invoiceToEdit: Invoice | null;
   invoiceToDuplicate: Invoice | null;
   invoiceToPrint: { invoice: Invoice, customer: Customer } | null;
+  quoteToPrint: { quote: Quote, customer: Customer } | null;
   invoiceMode: 'sale' | 'advance' | null;
 }
 
@@ -374,6 +375,7 @@ export interface AppContextType extends AppState {
   setInvoiceToEdit: (invoice: Invoice | null) => void;
   setInvoiceToDuplicate: (invoice: Invoice | null) => void;
   setInvoiceToPrint: (data: { invoice: Invoice, customer: Customer } | null) => void;
+  setQuoteToPrint: (data: { quote: Quote, customer: Customer } | null) => void;
   viewInvoice: (invoiceId: string) => void;
 }
 

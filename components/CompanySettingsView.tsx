@@ -38,17 +38,28 @@ export const CompanySettingsView: React.FC = () => {
             setIsUploadingLogo(true);
             setUploadError(null);
             try {
-                const logoUrl = await firebaseService.uploadFile(file, `company/logo-${Date.now()}`);
-                setFormState(prev => ({ ...prev, logoUrl }));
+                // Verificar tamaño del archivo (max 500KB para evitar problemas con Firestore)
+                if (file.size > 500 * 1024) {
+                    setUploadError('El logo debe ser menor a 500KB. Por favor, usa una imagen más pequeña.');
+                    setIsUploadingLogo(false);
+                    return;
+                }
+
+                // Convertir a base64 para evitar problemas de CORS
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const base64 = event.target?.result as string;
+                    setFormState(prev => ({ ...prev, logoUrl: base64 }));
+                    setIsUploadingLogo(false);
+                };
+                reader.onerror = () => {
+                    setUploadError('Error al leer el archivo. Por favor, intenta de nuevo.');
+                    setIsUploadingLogo(false);
+                };
+                reader.readAsDataURL(file);
             } catch (error: any) {
-                console.error('Error uploading logo:', error);
-                const errorMessage = error?.code === 'storage/unauthorized'
-                    ? 'No tienes permisos para subir archivos. Verifica la configuración de Firebase Storage.'
-                    : error?.code === 'storage/unknown' || error?.message?.includes('storage')
-                    ? 'Firebase Storage no está configurado. Por favor, activa el plan Blaze en Firebase Console.'
-                    : error?.message || 'Error al subir el logo. Por favor, intenta de nuevo.';
-                setUploadError(errorMessage);
-            } finally {
+                console.error('Error processing logo:', error);
+                setUploadError(error?.message || 'Error al procesar el logo. Por favor, intenta de nuevo.');
                 setIsUploadingLogo(false);
             }
         }
