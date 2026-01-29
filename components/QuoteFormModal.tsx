@@ -128,14 +128,14 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
 
     return (
         <>
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
-                <div className="bg-slate-50 min-h-full w-full max-w-4xl max-h-[90vh] rounded-lg shadow-lg flex flex-col">
-                    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-lg flex-grow flex flex-col">
-                        <header className="flex justify-between items-center pb-4 border-b mb-6">
-                            <h2 className="text-xl font-bold text-slate-800">{quoteToEdit ? 'Editar Cotización' : 'Crear Nueva Cotización'}</h2>
-                            <button type="button" onClick={onClose}><X size={20} /></button>
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center">
+                <div className="bg-white w-full sm:max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:m-4 sm:rounded-lg shadow-lg flex flex-col overflow-hidden">
+                    <form onSubmit={handleSubmit} className="flex-grow flex flex-col overflow-hidden">
+                        <header className="flex justify-between items-center p-4 sm:p-6 pb-4 border-b bg-white sticky top-0 z-10 flex-shrink-0">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-800">{quoteToEdit ? 'Editar Cotización' : 'Crear Nueva Cotización'}</h2>
+                            <button type="button" onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={20} /></button>
                         </header>
-                        <main className="space-y-6 flex-grow overflow-y-auto pr-2">
+                        <main className="space-y-6 flex-grow overflow-y-auto p-4 sm:p-6 pt-4">
                             <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                                 <div className="md:col-span-3 space-y-4">
                                     <h3 className="text-lg font-semibold text-slate-600 border-b pb-2">Información del Cliente</h3>
@@ -257,7 +257,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                                 </div>
                             </div>
                         </main>
-                        <footer className="flex flex-col md:flex-row justify-between items-start gap-6 pt-6 mt-6 border-t">
+                        <footer className="flex flex-col md:flex-row justify-between items-start gap-4 sm:gap-6 p-4 sm:p-6 border-t bg-slate-50 flex-shrink-0">
                             <div className="w-full md:w-auto flex flex-col sm:flex-row justify-end gap-4">
                                 <button type="button" onClick={onClose} className="px-5 py-2 text-sm font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300">Cancelar</button>
                                 <button type="submit" className="px-5 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700 flex items-center justify-center gap-2">
