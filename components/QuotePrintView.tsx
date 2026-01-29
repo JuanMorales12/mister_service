@@ -58,6 +58,10 @@ export const QuotePrintView: React.FC = () => {
             const validUntil = new Date(quote.date);
             validUntil.setDate(validUntil.getDate() + 15);
 
+            // Usar datos de la cotización directamente
+            const customerName = quote.customerName || customer.name || 'Cliente potencial';
+            const customerPhone = quote.customerPhone || customer.phone || '';
+
             const message = `*${companyInfo.name}*
 ━━━━━━━━━━━━━━━━━
 *COTIZACIÓN #${quote.quoteNumber}*
@@ -65,7 +69,7 @@ Fecha: ${new Date(quote.date).toLocaleDateString('es-ES')}
 Válida hasta: ${validUntil.toLocaleDateString('es-ES')}
 ━━━━━━━━━━━━━━━━━
 
-*Cliente:* ${customer.name}
+*Cliente:* ${customerName}
 *Total:* RD$ ${formatCurrency(quote.total)}
 
 📄 *Ver/Descargar Cotización PDF:*
@@ -78,7 +82,7 @@ ${companyInfo.email ? `Email: ${companyInfo.email}` : ''}
 _Gracias por su preferencia_`;
 
             // 4. Abrir WhatsApp
-            const phoneNumber = customer.phone?.replace(/\D/g, '') || '';
+            const phoneNumber = customerPhone.replace(/\D/g, '');
             const encodedMessage = encodeURIComponent(message);
             const whatsappUrl = phoneNumber
                 ? `https://wa.me/${phoneNumber.startsWith('1') || phoneNumber.startsWith('809') || phoneNumber.startsWith('829') || phoneNumber.startsWith('849') ? phoneNumber : '1' + phoneNumber}?text=${encodedMessage}`
@@ -140,8 +144,8 @@ _Gracias por su preferencia_`;
                  <section className="my-6 grid grid-cols-2 gap-4">
                     <div className="p-3 border rounded-md bg-slate-50">
                         <h3 className="font-semibold text-slate-700">Cliente:</h3>
-                        <p className="font-bold">{customer.name}</p>
-                        <p>Tel: {customer.phone}</p>
+                        <p className="font-bold">{quote.customerName || customer.name || 'Cliente potencial'}</p>
+                        {(quote.customerPhone || customer.phone) && <p>Tel: {quote.customerPhone || customer.phone}</p>}
                         {customer.email && <p>Email: {customer.email}</p>}
                         {customer.rnc && <p>RNC: {customer.rnc}</p>}
                     </div>

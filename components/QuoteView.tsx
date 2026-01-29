@@ -7,7 +7,7 @@ import { formatCurrency } from '../src/utils';
 import { QuoteFormModal } from './QuoteFormModal';
 
 export const QuoteView: React.FC = () => {
-    const { quotes, customers, staff, setQuoteToConvertToInvoice, goHome, setMode, deleteQuote, updateQuote, companyInfo, setQuoteToPrint, setGlobalError } = useContext(AppContext) as AppContextType;
+    const { quotes, customers, staff, setQuoteToConvertToInvoice, goHome, setMode, deleteQuote, updateQuote, companyInfo, setQuoteToPrint } = useContext(AppContext) as AppContextType;
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [quoteToEdit, setQuoteToEdit] = useState<Quote | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -52,6 +52,8 @@ export const QuoteView: React.FC = () => {
         try {
             await updateQuote(quote.id, {
                 customerId: quote.customerId,
+                customerName: quote.customerName,
+                customerPhone: quote.customerPhone,
                 date: quote.date,
                 items: quote.items,
                 discount: quote.discount,
@@ -64,9 +66,13 @@ export const QuoteView: React.FC = () => {
         }
     };
 
-    const getCustomerName = (customerId: string) => {
-        if (!customerId) return 'Cliente potencial';
-        return customers.find(c => c.id === customerId)?.name || 'Cliente potencial';
+    // Verificar si es cliente registrado o potencial
+    const isRegisteredCustomer = (quote: Quote) => {
+        return quote.customerId && customers.some(c => c.id === quote.customerId);
+    };
+
+    const getCustomerDisplay = (quote: Quote) => {
+        return quote.customerName || 'Cliente potencial';
     };
     
     const statusClasses: Record<Quote['status'], string> = {
@@ -89,12 +95,13 @@ export const QuoteView: React.FC = () => {
             const lowercasedQuery = searchQuery.toLowerCase();
             result = result.filter(quote =>
                 quote.quoteNumber.toLowerCase().includes(lowercasedQuery) ||
-                getCustomerName(quote.customerId).toLowerCase().includes(lowercasedQuery)
+                (quote.customerName || '').toLowerCase().includes(lowercasedQuery) ||
+                (quote.customerPhone || '').includes(searchQuery.replace(/\D/g, ''))
             );
         }
 
         return result;
-    }, [quotes, searchQuery, statusFilter, customers]);
+    }, [quotes, searchQuery, statusFilter]);
 
     // Contador de cotizaciones por estado
     const statusCounts = useMemo(() => {
@@ -115,12 +122,12 @@ export const QuoteView: React.FC = () => {
 
     // Función para imprimir/PDF
     const handlePrintQuote = (quote: Quote) => {
-        const customer = customers.find(c => c.id === quote.customerId);
-        // Si no hay cliente, crear uno temporal con "Cliente potencial"
-        const customerData = customer || {
-            id: '',
-            name: 'Cliente potencial',
-            phone: '',
+        // Buscar cliente existente si hay customerId, sino usar datos de la cotización
+        const existingCustomer = quote.customerId ? customers.find(c => c.id === quote.customerId) : null;
+        const customerData = existingCustomer || {
+            id: quote.customerId || '',
+            name: quote.customerName || 'Cliente potencial',
+            phone: quote.customerPhone || '',
             email: '',
             address: '',
             serviceHistory: []
@@ -130,7 +137,9 @@ export const QuoteView: React.FC = () => {
 
     // Función para compartir por WhatsApp
     const handleShareWhatsApp = (quote: Quote) => {
-        const customer = customers.find(c => c.id === quote.customerId);
+        // Usar datos de la cotización directamente
+        const customerName = quote.customerName || 'Cliente potencial';
+        const customerPhone = quote.customerPhone || '';
         const itemsList = quote.items.map(item => `• ${item.quantity}x ${item.description}: RD$ ${formatCurrency(item.quantity * item.sellPrice)}`).join('\n');
 
         const message = `*${companyInfo.name}*
@@ -139,8 +148,8 @@ export const QuoteView: React.FC = () => {
 Fecha: ${new Date(quote.date).toLocaleDateString('es-ES')}
 ━━━━━━━━━━━━━━━━━
 
-${customer ? `*Cliente:* ${customer.name}` : ''}
-${customer?.phone ? `*Tel:* ${customer.phone}` : ''}
+*Cliente:* ${customerName}
+${customerPhone ? `*Tel:* ${customerPhone}` : ''}
 
 *Detalle:*
 ${itemsList}
@@ -159,7 +168,7 @@ ${companyInfo.email ? `Email: ${companyInfo.email}` : ''}
 
 _Gracias por su preferencia_`;
 
-        const phoneNumber = customer?.phone?.replace(/\D/g, '') || '';
+        const phoneNumber = customerPhone.replace(/\D/g, '');
         const encodedMessage = encodeURIComponent(message);
         const whatsappUrl = phoneNumber
             ? `https://wa.me/${phoneNumber.startsWith('1') || phoneNumber.startsWith('809') || phoneNumber.startsWith('829') || phoneNumber.startsWith('849') ? phoneNumber : '1' + phoneNumber}?text=${encodedMessage}`
@@ -238,11 +247,20 @@ _Gracias por su preferencia_`;
                             const creator = staff.find(s => s.id === quote.createdById);
                             const creatorDisplay = creator ? creator.name : 'Sistema';
 
+                            const isPotentialCustomer = !isRegisteredCustomer(quote);
+
                             return (
                                 <div key={quote.id} className="p-4 bg-slate-50 rounded-md border border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center">
                                     <div className="mb-2 sm:mb-0 space-y-1">
                                         <p className="font-semibold text-slate-800">{quote.quoteNumber}</p>
-                                        <p className="text-sm text-slate-600">{getCustomerName(quote.customerId)}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm text-slate-600">{getCustomerDisplay(quote)}</p>
+                                            {isPotentialCustomer && (
+                                                <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">
+                                                    Potencial
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-4 text-xs text-slate-500">
                                             <div className="flex items-center gap-1.5 min-w-0">
                                                 <Wrench size={12} className="flex-shrink-0" />
