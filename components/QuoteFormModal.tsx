@@ -1,7 +1,9 @@
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AppContext, AppContextType, Customer, Quote, InvoiceLineItem, QuoteStatus } from '../src/types';
-import { X, PlusCircle, Trash2, Pencil, Save, User } from 'lucide-react';
+import { X, PlusCircle, Trash2, Pencil, Save, User, UserPlus } from 'lucide-react';
 import { InvoiceItemModal } from './InvoiceItemModal';
+import { CustomerFormModal } from './CustomerFormModal';
+import { formatCurrency } from '../src/utils';
 
 interface QuoteFormModalProps {
   isOpen: boolean;
@@ -10,7 +12,7 @@ interface QuoteFormModalProps {
 }
 
 export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose, quoteToEdit }) => {
-    const { customers, addQuote, updateQuote, staff } = useContext(AppContext) as AppContextType;
+    const { customers, addQuote, updateQuote, staff, addCustomer } = useContext(AppContext) as AppContextType;
     
     const [customer, setCustomer] = useState<Customer | null>(null);
     const [date, setDate] = useState(new Date());
@@ -25,6 +27,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
     const [customerSearchQuery, setCustomerSearchQuery] = useState('');
     const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
     
     const resetForm = useCallback(() => {
         setCustomer(null);
@@ -54,23 +57,33 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
     }, [isOpen, quoteToEdit, customers, resetForm]);
     
      useEffect(() => {
-        if (customerSearchQuery.trim() && !customer) {
-          const lowercasedQuery = customerSearchQuery.toLowerCase();
-          const filtered = customers.filter(c => 
-            c.name.toLowerCase().includes(lowercasedQuery) || 
-            c.phone.replace(/\D/g, '').includes(customerSearchQuery.replace(/\D/g, ''))
+        if (customerSearchQuery.trim()) {
+          const lowercasedQuery = customerSearchQuery.toLowerCase().trim();
+          const searchPhone = customerSearchQuery.replace(/\D/g, '');
+          const filtered = customers.filter(c =>
+            c.name.toLowerCase().includes(lowercasedQuery) ||
+            (searchPhone && c.phone.replace(/\D/g, '').includes(searchPhone))
           ).slice(0, 5);
           setCustomerSearchResults(filtered);
         } else {
           setCustomerSearchResults([]);
         }
-    }, [customerSearchQuery, customers, customer]);
+    }, [customerSearchQuery, customers]);
     
     const handleCustomerSelect = (selectedCustomer: Customer) => {
         setCustomer(selectedCustomer);
         setCustomerSearchQuery(selectedCustomer.name);
         setCustomerSearchResults([]);
         setIsSearchFocused(false);
+    };
+
+    const handleCreateCustomer = async (customerData: Omit<Customer, 'id' | 'serviceHistory'>) => {
+        const newCustomer = await addCustomer(customerData);
+        if (newCustomer) {
+            setCustomer(newCustomer);
+            setCustomerSearchQuery(newCustomer.name);
+        }
+        setIsCreatingCustomer(false);
     };
 
     const handleSaveItem = (item: InvoiceLineItem) => {
@@ -137,9 +150,33 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                                             placeholder="Buscar cliente..."
                                             className="mt-1 input-style"
                                         />
-                                        {isSearchFocused && customerSearchResults.length > 0 && (
-                                            <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg">
-                                                {customerSearchResults.map(c => <button key={c.id} type="button" onMouseDown={() => handleCustomerSelect(c)} className="w-full text-left p-2 hover:bg-sky-100">{c.name}</button>)}
+                                        {isSearchFocused && customerSearchQuery.trim() && !customer && (
+                                            <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                {customerSearchResults.length > 0 ? (
+                                                    customerSearchResults.map(c => (
+                                                        <button
+                                                            key={c.id}
+                                                            type="button"
+                                                            onMouseDown={() => handleCustomerSelect(c)}
+                                                            className="w-full text-left p-2 hover:bg-sky-100 border-b last:border-b-0"
+                                                        >
+                                                            <div className="font-medium">{c.name}</div>
+                                                            <div className="text-xs text-slate-500">{c.phone}</div>
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-3">
+                                                        <p className="text-sm text-slate-500 mb-2">No se encontraron clientes con "{customerSearchQuery}"</p>
+                                                        <button
+                                                            type="button"
+                                                            onMouseDown={() => setIsCreatingCustomer(true)}
+                                                            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700"
+                                                        >
+                                                            <UserPlus size={16} />
+                                                            Crear Nuevo Cliente
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -204,8 +241,8 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                                                 <tr key={item.id} className="border-b last:border-b-0 hover:bg-slate-50">
                                                     <td className="p-2">{item.quantity}</td>
                                                     <td className="p-2">{item.description}</td>
-                                                    <td className="p-2 text-right whitespace-nowrap">RD$ {item.sellPrice.toFixed(2)}</td>
-                                                    <td className="p-2 text-right font-medium whitespace-nowrap">RD$ {(item.sellPrice * item.quantity).toFixed(2)}</td>
+                                                    <td className="p-2 text-right whitespace-nowrap">RD$ {formatCurrency(item.sellPrice)}</td>
+                                                    <td className="p-2 text-right font-medium whitespace-nowrap">RD$ {formatCurrency(item.sellPrice * item.quantity)}</td>
                                                     <td className="p-2">
                                                         <div className="flex justify-center gap-1">
                                                             <button type="button" onClick={() => handleEditItem(item)} className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-500 hover:text-sky-600"><Pencil size={16}/></button>
@@ -229,19 +266,19 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                             </div>
                              <div className="w-full md:w-auto md:flex-grow flex justify-end">
                                 <div className="w-full max-w-sm space-y-2 text-sm">
-                                    <div className="flex justify-between"><span>SubTotal:</span> <span>RD$ {subtotal.toFixed(2)}</span></div>
+                                    <div className="flex justify-between"><span>SubTotal:</span> <span>RD$ {formatCurrency(subtotal)}</span></div>
                                     <div className="flex justify-between">
                                         <span>Descuento ({discount.toFixed(2)}%):</span>
-                                        <span>- RD$ {discountAmount.toFixed(2)}</span>
+                                        <span>- RD$ {formatCurrency(discountAmount)}</span>
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <label htmlFor="quote-isTaxable" className="flex items-center gap-2 cursor-pointer">
                                             <input type="checkbox" id="quote-isTaxable" checked={isTaxable} onChange={e => setIsTaxable(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"/>
                                             <span>ITBIS ({isTaxable ? '18%' : '0%'}):</span>
                                         </label>
-                                        <span>RD$ {taxes.toFixed(2)}</span>
+                                        <span>RD$ {formatCurrency(taxes)}</span>
                                     </div>
-                                    <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2 text-slate-800"><span>Total General:</span> <span>RD$ {total.toFixed(2)}</span></div>
+                                    <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2 text-slate-800"><span>Total General:</span> <span>RD$ {formatCurrency(total)}</span></div>
                                 </div>
                             </div>
                         </footer>
@@ -256,6 +293,13 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
                     itemToEdit={itemToEdit}
                 />
             )}
+            <CustomerFormModal
+                isOpen={isCreatingCustomer}
+                onClose={() => setIsCreatingCustomer(false)}
+                onSave={handleCreateCustomer}
+                customerToEdit={null}
+                initialName={customerSearchQuery}
+            />
              <style>{`.input-style { color: #0f172a; display: block; width: 100%; padding: 0.5rem 0.75rem; background-color: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; box-shadow: sm; placeholder-slate-400; focus:outline-none focus:ring-sky-500 focus:border-sky-500; } .input-style:disabled, .input-style:read-only { background-color: #f1f5f9; cursor: not-allowed; } .label-style { display: block; font-weight: 500; font-size: 0.875rem; color: #334155; }`}</style>
         </>
     );

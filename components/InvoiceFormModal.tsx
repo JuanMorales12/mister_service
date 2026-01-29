@@ -4,6 +4,7 @@ import { X, PlusCircle, Trash2, Pencil, Save, User, UserPlus, CheckCircle, Loade
 import { InvoiceItemModal } from './InvoiceItemModal';
 import { RecordPaymentModal } from './RecordPaymentModal';
 import { CustomerFormModal } from './CustomerFormModal';
+import { formatCurrency } from '../src/utils';
 
 
 export const InvoiceFormModal: React.FC = () => {
@@ -375,8 +376,8 @@ export const InvoiceFormModal: React.FC = () => {
                                                 <td className="p-2">{item.quantity}</td>
                                                 <td className="p-2">{item.description}</td>
                                                 <td className="p-2 text-slate-500 text-xs">{item.commission?.technicianId ? staff.find(s=>s.id === item.commission?.technicianId)?.name : 'N/A'}</td>
-                                                <td className="p-2 text-right whitespace-nowrap">RD$ {item.sellPrice.toFixed(2)}</td>
-                                                <td className="p-2 text-right font-medium whitespace-nowrap">RD$ {(item.sellPrice * item.quantity).toFixed(2)}</td>
+                                                <td className="p-2 text-right whitespace-nowrap">RD$ {formatCurrency(item.sellPrice)}</td>
+                                                <td className="p-2 text-right font-medium whitespace-nowrap">RD$ {formatCurrency(item.sellPrice * item.quantity)}</td>
                                                 <td className="p-2">
                                                     <div className="flex justify-center gap-1">
                                                         <button type="button" onClick={() => handleEditItem(item)} className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-500 hover:text-sky-600"><Pencil size={16}/></button>
@@ -402,19 +403,19 @@ export const InvoiceFormModal: React.FC = () => {
                         </div>
                         <div className="w-full md:w-auto md:flex-grow flex justify-end">
                             <div className="w-full max-w-sm space-y-2 text-sm">
-                                <div className="flex justify-between"><span>SubTotal:</span> <span>RD$ {subtotal.toFixed(2)}</span></div>
+                                <div className="flex justify-between"><span>SubTotal:</span> <span>RD$ {formatCurrency(subtotal)}</span></div>
                                 <div className="flex justify-between">
-                                    <span>Descuento ({discount.toFixed(2)}%):</span> 
-                                    <span>- RD$ {discountAmount.toFixed(2)}</span>
+                                    <span>Descuento ({discount.toFixed(2)}%):</span>
+                                    <span>- RD$ {formatCurrency(discountAmount)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <label htmlFor="invoice-isTaxable" className="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" id="invoice-isTaxable" checked={isTaxable} onChange={e => setIsTaxable(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"/>
                                         <span>ITBIS ({isTaxable ? '18%' : '0%'}):</span>
                                     </label>
-                                    <span>RD$ {taxes.toFixed(2)}</span>
+                                    <span>RD$ {formatCurrency(taxes)}</span>
                                 </div>
-                                <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2 text-slate-800"><span>Total General:</span> <span>RD$ {total.toFixed(2)}</span></div>
+                                <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2 text-slate-800"><span>Total General:</span> <span>RD$ {formatCurrency(total)}</span></div>
                             </div>
                         </div>
                     </footer>

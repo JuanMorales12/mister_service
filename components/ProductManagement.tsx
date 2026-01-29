@@ -3,6 +3,7 @@ import React, { useContext, useState, useMemo } from 'react';
 import { AppContext, AppContextType, Product } from '../src/types';
 import { PlusCircle, Package, Edit, Trash2, Search, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { ProductFormModal } from './ProductFormModal';
+import { formatCurrency } from '../src/utils';
 
 export const ProductManagement: React.FC = () => {
     const { products, deleteProduct, setMode, invoices } = useContext(AppContext) as AppContextType;
@@ -110,7 +111,7 @@ export const ProductManagement: React.FC = () => {
                                                 {product.supplier && <div className="text-xs text-slate-400">{product.supplier}</div>}
                                             </td>
                                             <td className="px-4 py-3 text-slate-600">{product.brand || '-'}</td>
-                                            <td className="px-4 py-3 text-right whitespace-nowrap">RD$ {product.sellPrice1.toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">RD$ {formatCurrency(product.sellPrice1)}</td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.stock > 0 ? 'bg-slate-100 text-slate-700' : 'bg-red-100 text-red-800'}`}>
                                                     {product.stock}

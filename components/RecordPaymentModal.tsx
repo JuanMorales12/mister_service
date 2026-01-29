@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { AppContext, AppContextType, Invoice, PaymentMethod, PaymentDetails } from '../src/types';
 import { X, Save, DollarSign } from 'lucide-react';
+import { formatCurrency } from '../src/utils';
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -57,7 +58,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
                 <main className="p-6 space-y-4">
                     <div className="text-center">
                         <p className="text-sm text-slate-500">Total a Pagar</p>
-                        <p className="text-4xl font-bold text-slate-800">RD$ {amountToPay.toFixed(2)}</p>
+                        <p className="text-4xl font-bold text-slate-800">RD$ {formatCurrency(amountToPay)}</p>
                     </div>
                     <div>
                         <label className="label-style">Método de Pago</label>
@@ -77,7 +78,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
                             </div>
                             <div className="p-3 bg-sky-50 rounded-md text-center">
                                 <p className="text-sm text-sky-800">Devuelta</p>
-                                <p className="text-2xl font-bold text-sky-800">RD$ {changeGiven.toFixed(2)}</p>
+                                <p className="text-2xl font-bold text-sky-800">RD$ {formatCurrency(changeGiven)}</p>
                             </div>
                         </>
                     ) : (
