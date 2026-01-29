@@ -222,7 +222,9 @@ export type QuoteStatus = 'Borrador' | 'Enviada' | 'Aceptada' | 'Rechazada';
 export interface Quote {
     id: string;
     quoteNumber: string;
-    customerId: string;
+    customerId: string; // ID si es cliente existente, vacío si es potencial
+    customerName: string; // Nombre del cliente/potencial
+    customerPhone: string; // Teléfono del cliente/potencial
     date: Date;
     items: InvoiceLineItem[];
     subtotal: number;
