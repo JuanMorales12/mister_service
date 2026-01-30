@@ -149,7 +149,8 @@ export interface Product {
     sellPrice1: number;
     sellPrice2: number;
     sellPrice3: number;
-    stock: number;
+    initialStock: number; // Cantidad inicial (fija, no cambia)
+    stock: number; // Disponible (se reduce con ventas)
     // Nuevos campos QA
     brand?: string; // Marca
     description?: string; // Descripción

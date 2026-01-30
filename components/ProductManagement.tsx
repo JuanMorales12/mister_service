@@ -21,9 +21,16 @@ export const ProductManagement: React.FC = () => {
             }, 0);
     };
 
+    // Stock disponible = stock actual menos reservado
     const getAvailableStock = (product: Product): number => {
         const reserved = getReservedQuantity(product.id);
         return Math.max(0, product.stock - reserved);
+    };
+
+    // Cantidad inicial (fija, no cambia)
+    const getInitialStock = (product: Product): number => {
+        // Si el producto tiene initialStock definido, usarlo; si no, usar stock como fallback
+        return product.initialStock ?? product.stock;
     };
 
     const handleOpenCreateModal = () => {
@@ -91,7 +98,7 @@ export const ProductManagement: React.FC = () => {
                                 <th className="px-4 py-3">Producto</th>
                                 <th className="px-4 py-3">Marca</th>
                                 <th className="px-4 py-3 text-right">Precio Venta</th>
-                                <th className="px-4 py-3 text-center">Stock</th>
+                                <th className="px-4 py-3 text-center">Cant. Inicial</th>
                                 <th className="px-4 py-3 text-center">Disponible</th>
                                 <th className="px-4 py-3 text-center">Estado</th>
                                 <th className="px-4 py-3 text-center">Acciones</th>
@@ -113,20 +120,20 @@ export const ProductManagement: React.FC = () => {
                                             <td className="px-4 py-3 text-slate-600">{product.brand || '-'}</td>
                                             <td className="px-4 py-3 text-right whitespace-nowrap">RD$ {formatCurrency(product.sellPrice1)}</td>
                                             <td className="px-4 py-3 text-center">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.stock > 0 ? 'bg-slate-100 text-slate-700' : 'bg-red-100 text-red-800'}`}>
-                                                    {product.stock}
+                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                                                    {getInitialStock(product)}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex items-center justify-center gap-1">
                                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                        availableStock === 0 ? 'bg-red-100 text-red-800' :
-                                                        isLowStock ? 'bg-amber-100 text-amber-800' :
+                                                        product.stock === 0 ? 'bg-red-100 text-red-800' :
+                                                        product.stock <= 5 ? 'bg-amber-100 text-amber-800' :
                                                         'bg-green-100 text-green-800'
                                                     }`}>
-                                                        {availableStock}
+                                                        {product.stock}
                                                     </span>
-                                                    {isLowStock && <AlertTriangle size={14} className="text-amber-500" title="Stock bajo"/>}
+                                                    {product.stock <= 5 && product.stock > 0 && <AlertTriangle size={14} className="text-amber-500" title="Stock bajo"/>}
                                                 </div>
                                                 {reserved > 0 && <div className="text-xs text-slate-400 mt-1">({reserved} reserv.)</div>}
                                             </td>

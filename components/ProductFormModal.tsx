@@ -17,7 +17,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
     const [sellPrice1, setSellPrice1] = useState(0);
     const [sellPrice2, setSellPrice2] = useState(0);
     const [sellPrice3, setSellPrice3] = useState(0);
-    const [stock, setStock] = useState(0);
+    const [initialStock, setInitialStock] = useState(0); // Cantidad inicial (fija)
+    const [stock, setStock] = useState(0); // Disponible (se reduce con ventas)
     // Nuevos campos
     const [brand, setBrand] = useState('');
     const [description, setDescription] = useState('');
@@ -38,6 +39,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                 setSellPrice1(productToEdit.sellPrice1);
                 setSellPrice2(productToEdit.sellPrice2);
                 setSellPrice3(productToEdit.sellPrice3);
+                setInitialStock(productToEdit.initialStock ?? productToEdit.stock);
                 setStock(productToEdit.stock);
                 setBrand(productToEdit.brand || '');
                 setDescription(productToEdit.description || '');
@@ -53,6 +55,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                 setSellPrice1(0);
                 setSellPrice2(0);
                 setSellPrice3(0);
+                setInitialStock(0);
                 setStock(0);
                 setBrand('');
                 setDescription('');
@@ -97,6 +100,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
             setSellPrice1(existingProduct.sellPrice1);
             setSellPrice2(existingProduct.sellPrice2);
             setSellPrice3(existingProduct.sellPrice3);
+            setInitialStock(existingProduct.initialStock ?? existingProduct.stock);
             setStock(existingProduct.stock);
             setBrand(existingProduct.brand || '');
             setDescription(existingProduct.description || '');
@@ -116,6 +120,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
             alert('Por favor corrige el código duplicado antes de guardar.');
             return;
         }
+        // Para producto nuevo: initialStock = stock (cantidad inicial)
+        // Para edición: mantener initialStock, solo actualizar stock disponible
+        const effectiveInitialStock = productToEdit ? initialStock : stock;
+
         const productData = {
             code,
             name,
@@ -124,6 +132,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
             sellPrice1,
             sellPrice2,
             sellPrice3,
+            initialStock: effectiveInitialStock,
             stock,
             brand, // Campo obligatorio
             description: description || undefined,
@@ -165,7 +174,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                     {/* Información básica */}
                     <fieldset className="border p-4 rounded-md">
                         <legend className="text-sm font-semibold px-2 text-slate-600">Información Básica</legend>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className={`grid gap-4 ${productToEdit ? 'grid-cols-3' : 'grid-cols-2'}`}>
                             <div>
                                 <label className="label-style">Código *</label>
                                 <input type="text" value={code} onChange={e => handleCodeChange(e.target.value)} required className={`mt-1 input-style ${codeError ? 'border-red-500' : ''}`} placeholder="Ej: REF-001"/>
@@ -184,10 +193,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                                     </div>
                                 )}
                             </div>
-                            <div>
-                                <label className="label-style">Stock</label>
-                                <input type="number" value={stock || ''} onChange={e => setStock(e.target.value === '' ? 0 : parseInt(e.target.value))} className="mt-1 input-style"/>
-                            </div>
+                            {productToEdit ? (
+                                <>
+                                    <div>
+                                        <label className="label-style">Cant. Inicial</label>
+                                        <input type="number" value={initialStock || ''} disabled className="mt-1 input-style bg-slate-100 cursor-not-allowed" title="La cantidad inicial no se puede modificar"/>
+                                    </div>
+                                    <div>
+                                        <label className="label-style">Disponible</label>
+                                        <input type="number" value={stock || ''} onChange={e => setStock(e.target.value === '' ? 0 : parseInt(e.target.value))} className="mt-1 input-style"/>
+                                    </div>
+                                </>
+                            ) : (
+                                <div>
+                                    <label className="label-style">Cantidad Inicial</label>
+                                    <input type="number" value={stock || ''} onChange={e => setStock(e.target.value === '' ? 0 : parseInt(e.target.value))} className="mt-1 input-style" placeholder="Ej: 10"/>
+                                </div>
+                            )}
                         </div>
                         <div className="grid grid-cols-2 gap-4 mt-4">
                             <div>
