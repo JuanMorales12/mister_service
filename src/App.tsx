@@ -1201,7 +1201,9 @@ const addProduct = async (productData: Omit<Product, 'id'>) => {
     try {
         const newProduct: Product = {
             ...productData,
-            id: `prod_${Date.now()}`
+            id: `prod_${Date.now()}`,
+            // Si no viene initialStock, usar el stock como cantidad inicial
+            initialStock: productData.initialStock ?? productData.stock
         };
         await firebaseService.saveState({
             ...syncedState,

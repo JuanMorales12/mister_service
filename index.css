@@ -1,0 +1,56 @@
+/* Global Print Styles */
+@media print {
+    /* Ocultar COMPLETAMENTE el #root cuando hay impresión activa */
+    body.print-mode-active #root {
+        display: none !important;
+    }
+
+    /* El contenedor de impresión debe estar fuera del flujo normal */
+    body.print-mode-active > #print-container-wrapper {
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Ocultar botones de impresión */
+    body.print-mode-active #print-buttons,
+    body.print-mode-active .no-print {
+        display: none !important;
+    }
+
+    /* Estilo del contenido de impresión */
+    body.print-mode-active #invoice-print-content,
+    body.print-mode-active #quote-print-content {
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 10mm !important;
+        box-shadow: none !important;
+        background: white !important;
+    }
+
+    /* Reset del body */
+    body.print-mode-active {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        overflow: visible !important;
+    }
+
+    /* Asegurar colores correctos en impresión */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+
+@page {
+    size: A4;
+    margin: 10mm;
+}
