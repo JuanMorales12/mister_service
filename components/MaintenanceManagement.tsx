@@ -55,7 +55,8 @@ export const MaintenanceManagement: React.FC = () => {
         if (!customer) return false;
 
         const nameMatch = customer.name.toLowerCase().includes(lowercasedQuery);
-        const phoneMatch = customer.phone.replace(/\D/g, '').includes(lowercasedQuery.replace(/\D/g, ''));
+        const digitsOnly = lowercasedQuery.replace(/\D/g, '');
+        const phoneMatch = digitsOnly.length >= 3 && customer.phone.replace(/\D/g, '').includes(digitsOnly);
         const serviceMatch = schedule.serviceDescription.toLowerCase().includes(lowercasedQuery);
 
         return nameMatch || phoneMatch || serviceMatch;

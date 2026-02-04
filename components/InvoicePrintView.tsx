@@ -2,7 +2,6 @@ import React, { useContext, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { AppContext, AppContextType } from '../src/types';
 import { Printer, Share2, X, Loader2 } from 'lucide-react';
-import { WhatsAppIcon } from './WhatsAppIcon';
 import { formatCurrency } from '../src/utils';
 import { generatePDF } from '../src/pdfGenerator';
 import { firebaseService } from '../services/firebaseService';
@@ -92,58 +91,6 @@ _Gracias por su preferencia_`;
         }
     };
 
-    const handleShareWhatsAppWithPDF = async () => {
-        setIsGeneratingPdf(true);
-        try {
-            // 1. Generar PDF
-            const pdfBlob = await generatePDF('invoice-print-content', `factura-${invoice.invoiceNumber}`);
-
-            // 2. Subir a Firebase Storage
-            const file = new File([pdfBlob], `factura-${invoice.invoiceNumber}-${Date.now()}.pdf`, { type: 'application/pdf' });
-            const pdfUrl = await firebaseService.uploadFile(file, `invoices/${invoice.invoiceNumber}-${Date.now()}.pdf`);
-
-            // Validar que el PDF se subió correctamente
-            if (!pdfUrl) {
-                throw new Error('No se pudo subir el PDF. Intenta nuevamente.');
-            }
-
-            // 3. Construir mensaje con link
-            const balanceDueAmount = invoice.total - invoice.paidAmount;
-            const message = `*${companyInfo.name}*
-━━━━━━━━━━━━━━━━━
-*FACTURA #${invoice.invoiceNumber}*
-Fecha: ${new Date(invoice.date).toLocaleDateString('es-ES')}
-━━━━━━━━━━━━━━━━━
-
-*Cliente:* ${customer.name}
-*Total:* RD$ ${formatCurrency(invoice.total)}
-${balanceDueAmount > 0 ? `*Balance Pendiente:* RD$ ${formatCurrency(balanceDueAmount)}` : '✅ *PAGADO*'}
-
-📄 *Ver/Descargar Factura PDF:*
-${pdfUrl}
-
-━━━━━━━━━━━━━━━━━
-${companyInfo.phone ? `Tel: ${companyInfo.phone}` : ''}
-${companyInfo.email ? `Email: ${companyInfo.email}` : ''}
-
-_Gracias por su preferencia_`;
-
-            // 4. Abrir WhatsApp
-            const phoneNumber = customer.phone?.replace(/\D/g, '') || '';
-            const encodedMessage = encodeURIComponent(message);
-            const whatsappUrl = phoneNumber
-                ? `https://wa.me/${phoneNumber.startsWith('1') || phoneNumber.startsWith('809') || phoneNumber.startsWith('829') || phoneNumber.startsWith('849') ? phoneNumber : '1' + phoneNumber}?text=${encodedMessage}`
-                : `https://wa.me/?text=${encodedMessage}`;
-
-            window.open(whatsappUrl, '_blank');
-        } catch (error) {
-            console.error('Error generating PDF:', error);
-            setGlobalError('Error al generar PDF: ' + (error as Error).message);
-        } finally {
-            setIsGeneratingPdf(false);
-        }
-    };
-
     const printContent = (
         <div className="fixed inset-0 z-[9999] print-container" id="print-container-wrapper">
             <div className="fixed top-4 right-4 flex flex-col gap-2 no-print z-[10000]" id="print-buttons">
@@ -153,16 +100,8 @@ _Gracias por su preferencia_`;
                 <button onClick={handlePrint} className="p-3 bg-sky-600 text-white rounded-full shadow-lg hover:bg-sky-700">
                     <Printer size={20}/>
                 </button>
-                <button onClick={handleShare} className="p-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700" title="Compartir">
-                    <Share2 size={20}/>
-                </button>
-                <button
-                    onClick={handleShareWhatsAppWithPDF}
-                    disabled={isGeneratingPdf}
-                    className="p-3 bg-emerald-500 text-white rounded-full shadow-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Enviar por WhatsApp con PDF"
-                >
-                    {isGeneratingPdf ? <Loader2 size={20} className="animate-spin"/> : <WhatsAppIcon size={20}/>}
+                <button onClick={handleShare} disabled={isGeneratingPdf} className="p-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed" title="Compartir">
+                    {isGeneratingPdf ? <Loader2 size={20} className="animate-spin"/> : <Share2 size={20}/>}
                 </button>
             </div>
             <div id="invoice-print-content" className="A4-sheet text-sm">
@@ -189,7 +128,7 @@ _Gracias por su preferencia_`;
                         <h3 className="font-semibold text-slate-700">Facturar a:</h3>
                         <p className="font-bold text-sm">{customer.name}</p>
                         <p>Tel: {customer.phone}</p>
-                        {customer.email && <p>Email: {customer.email}</p>}
+                        {customer.email && <p className="break-all">Email: {customer.email}</p>}
                         {customer.rnc && <p>RNC: {customer.rnc}</p>}
                     </div>
                      <div className="p-2 border rounded-md bg-slate-50 text-right">

@@ -7,7 +7,7 @@ import { GoogleCalendarService } from '../services/googleCalendarService';
 import { EmailService } from '../services/emailService';
 import { GOOGLE_CLIENT_ID } from '../config';
 import { firebaseService } from '../services/firebaseService';
-import { Loader2, AlertTriangle, X } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, X } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { LoginPage } from '../components/LoginPage';
 
@@ -29,6 +29,25 @@ const ErrorBanner: React.FC<{ message: string; onClose: () => void; }> = ({ mess
     </button>
   </div>
 );
+
+const SuccessBanner: React.FC<{ message: string; onClose: () => void; }> = ({ message, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="bg-green-600 text-white text-sm font-semibold p-4 flex justify-between items-center shadow-lg sticky top-[64px] z-[1000]" role="status">
+      <div className="flex items-center gap-3">
+        <CheckCircle size={20} />
+        <span>{message}</span>
+      </div>
+      <button onClick={onClose} aria-label="Cerrar" className="p-1 rounded-full hover:bg-green-700">
+        <X size={18} />
+      </button>
+    </div>
+  );
+};
 
 const defaultAvailability: DailyAvailability[] = [
     { dayOfWeek: 1, slots: [{ startTime: '09:00', endTime: '10:00' }, { startTime: '11:00', endTime: '12:00' }, { startTime: '13:00', endTime: '14:00' }, { startTime: '15:00', endTime: '16:00' }, { startTime: '17:00', endTime: '18:00' }] },
@@ -82,6 +101,7 @@ const App: React.FC = () => {
 
   // --- LOCAL STATE SETTERS (early for script loader) ---
   const setGlobalError = (error: string | null) => setLocalState(prev => prev ? ({ ...prev, globalError: error }) : null);
+  const setGlobalSuccess = (message: string | null) => setLocalState(prev => prev ? ({ ...prev, globalSuccess: message }) : null);
 
   // Load Google Maps script
   useEffect(() => {
@@ -154,7 +174,19 @@ const App: React.FC = () => {
     const unsubscribe = firebaseService.listenToStateChanges((newState) => {
         console.log("Firebase state updated, syncing local state.");
         const currentUser = newState.staff.find(s => s.email === authUser.email) || null;
-        setSyncedState(newState);
+
+        // Migración: fijar initialStock para productos que no lo tienen
+        const needsMigration = newState.products.some(p => p.initialStock == null);
+        if (needsMigration) {
+            const migratedProducts = newState.products.map(p =>
+                p.initialStock == null ? { ...p, initialStock: p.stock } : p
+            );
+            const migratedState = { ...newState, products: migratedProducts };
+            firebaseService.saveState(migratedState);
+            setSyncedState(migratedState);
+        } else {
+            setSyncedState(newState);
+        }
 
         if (isInitialLoad) {
             const initialMode: AppMode = currentUser?.role === 'tecnico' ? 'technician-calendar' : 'inicio';
@@ -163,6 +195,7 @@ const App: React.FC = () => {
                 googleAuth: { token: null, user: null },
                 currentUser: currentUser,
                 globalError: null,
+                globalSuccess: null,
                 orderToConvertToInvoice: null,
                 quoteToConvertToInvoice: null,
                 invoiceToEdit: null,
@@ -173,7 +206,7 @@ const App: React.FC = () => {
             });
             isInitialLoad = false;
         } else {
-             setLocalState(p => p ? ({ ...p, currentUser: currentUser, globalError: p.globalError }) : null);
+             setLocalState(p => p ? ({ ...p, currentUser: currentUser, globalError: p.globalError, globalSuccess: p.globalSuccess }) : null);
         }
     });
 
@@ -386,6 +419,18 @@ const App: React.FC = () => {
     }
   };
 
+  const deleteCustomer = async (customerId: string) => {
+    if (!syncedState) return;
+    try {
+        await firebaseService.saveState({
+            ...syncedState,
+            customers: syncedState.customers.filter(c => c.id !== customerId),
+        });
+    } catch (e: any) {
+        setGlobalError(getErrorMessage(e));
+    }
+  };
+
   const loadCustomers = async (customers: Customer[]) => {
     if (!syncedState) return;
     try {
@@ -403,7 +448,9 @@ const App: React.FC = () => {
     if (!syncedState || !localState) return;
     try {
       let customerId: string;
-      let existingCustomer = syncedState.customers.find(c => c.phone === orderData.customerPhone);
+      let existingCustomer = syncedState.customers.find(c =>
+        c.phone === orderData.customerPhone && c.name.toLowerCase() === orderData.customerName.toLowerCase()
+      );
       let newCustomer: Customer | null = null;
       let updatedCustomers = [...syncedState.customers];
 
@@ -427,7 +474,7 @@ const App: React.FC = () => {
 
       const newOrderNumber = syncedState.lastServiceOrderNumber + 1;
       const formattedOrderNumber = `OS-${String(newOrderNumber).padStart(4, '0')}`;
-      
+
       const newOrder: ServiceOrder = {
         ...orderData,
         id: `so${Date.now()}`,
@@ -460,6 +507,7 @@ const App: React.FC = () => {
         serviceOrders: [...syncedState.serviceOrders, newOrder],
         lastServiceOrderNumber: newOrderNumber,
       });
+
     } catch (e: any) {
       setGlobalError(getErrorMessage(e));
     }
@@ -1001,8 +1049,18 @@ const addInvoice = async (invoiceData: Omit<Invoice, 'id' | 'invoiceNumber' | 's
             paidAmount: 0
         };
 
+        // Descontar stock de productos de inventario al crear la factura
+        const updatedProducts = syncedState.products.map(product => {
+            const invoiceItem = newInvoice.items.find(item => item.type === 'Inventario' && item.productId === product.id);
+            if (invoiceItem) {
+                return { ...product, stock: Math.max(0, product.stock - invoiceItem.quantity) };
+            }
+            return product;
+        });
+
         await firebaseService.saveState({
             ...syncedState,
+            products: updatedProducts,
             invoices: [...syncedState.invoices, newInvoice],
             lastInvoiceNumber: newInvoiceNumber
         });
@@ -1042,9 +1100,9 @@ const updateInvoice = async (invoiceId: string, invoiceData: Omit<Invoice, 'id' 
             status: newStatus
         };
 
-        // Si una factura pagada se anula, devolver stock a los productos
+        // Si una factura se anula, devolver stock a los productos
         let updatedProducts = syncedState.products;
-        if (newStatus === 'Anulada' && original.status === 'Pagada') {
+        if (newStatus === 'Anulada' && original.status !== 'Anulada') {
             updatedProducts = syncedState.products.map(product => {
                 const invoiceItem = original.items.find(item => item.type === 'Inventario' && item.productId === product.id);
                 if (invoiceItem) {
@@ -1098,24 +1156,8 @@ const recordInvoicePayment = async (invoiceId: string, paymentDetails: PaymentDe
             status: newStatus
         };
 
-        // Si la factura pasa a "Pagada", descontar stock de productos de inventario
-        let updatedProducts = syncedState.products;
-        if (newStatus === 'Pagada' && wasNotPaid) {
-            updatedProducts = syncedState.products.map(product => {
-                const invoiceItem = invoice.items.find(item => item.type === 'Inventario' && item.productId === product.id);
-                if (invoiceItem) {
-                    return {
-                        ...product,
-                        stock: Math.max(0, product.stock - invoiceItem.quantity)
-                    };
-                }
-                return product;
-            });
-        }
-
         await firebaseService.saveState({
             ...syncedState,
-            products: updatedProducts,
             invoices: syncedState.invoices.map(i => i.id === invoiceId ? updatedInvoice : i)
         });
     } catch(e: any) {
@@ -1353,6 +1395,7 @@ const appContextValue: AppContextType | null = appState ? {
         }
     },
   setGlobalError,
+  setGlobalSuccess,
   signOut,
   addServiceOrder,
   confirmServiceOrder,
@@ -1369,6 +1412,7 @@ const appContextValue: AppContextType | null = appState ? {
   deleteCalendar,
   addCustomer,
   updateCustomer,
+  deleteCustomer,
   loadCustomers,
   signInToGoogle,
   signOutFromGoogle,
@@ -1474,6 +1518,7 @@ return (
       <div className="bg-slate-100 min-h-screen text-slate-900">
         <Header />
         {appContextValue.globalError && <ErrorBanner message={appContextValue.globalError} onClose={() => setGlobalError(null)} />}
+        {appContextValue.globalSuccess && <SuccessBanner message={appContextValue.globalSuccess} onClose={() => setGlobalSuccess(null)} />}
         <main className="p-4 sm:p-6 lg:p-8">
           <Dashboard />
         </main>

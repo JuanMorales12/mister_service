@@ -67,10 +67,11 @@ export const MaintenanceFormModal: React.FC<MaintenanceFormModalProps> = ({ isOp
 
     if (query.trim()) {
       const lowercasedQuery = query.toLowerCase();
-      const filtered = customers.filter(customer => 
-        customer.name.toLowerCase().includes(lowercasedQuery) || 
-        customer.phone.replace(/\D/g, '').includes(query.replace(/\D/g, ''))
-      ).slice(0, 5);
+      const digitsOnly = query.replace(/\D/g, '');
+      const filtered = customers.filter(customer =>
+        customer.name.toLowerCase().includes(lowercasedQuery) ||
+        (digitsOnly.length >= 3 && customer.phone.replace(/\D/g, '').includes(digitsOnly))
+      ).slice(0, 15);
       setCustomerSearchResults(filtered);
     } else {
       setCustomerSearchResults([]);

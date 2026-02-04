@@ -161,15 +161,26 @@ export const TechnicianCalendarView: React.FC = () => {
         if (!displayedTechId) return [];
         const techCalendar = calendars.find(c => c.userId === displayedTechId);
         if (!techCalendar?.availability) return [];
-        
-        const allSlots = new Set<string>();
+
+        // Obtener rango completo de horas de disponibilidad
+        let minHour = 23, maxHour = 0;
         techCalendar.availability.forEach(day => {
             day.slots.forEach(slot => {
-                allSlots.add(slot.startTime);
+                const startH = parseInt(slot.startTime.split(':')[0]);
+                const endH = parseInt(slot.endTime.split(':')[0]);
+                minHour = Math.min(minHour, startH);
+                maxHour = Math.max(maxHour, endH);
             });
         });
-        
-        return Array.from(allSlots).sort((a,b) => a.localeCompare(b));
+
+        if (minHour > maxHour) return [];
+
+        // Generar todas las horas entre min y max
+        const slots: string[] = [];
+        for (let h = minHour; h <= maxHour; h++) {
+            slots.push(`${String(h).padStart(2, '0')}:00`);
+        }
+        return slots;
     }, [displayedTechId, calendars]);
 
 

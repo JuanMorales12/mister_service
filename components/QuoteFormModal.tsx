@@ -11,7 +11,7 @@ interface QuoteFormModalProps {
 }
 
 export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose, quoteToEdit }) => {
-    const { customers, addQuote, updateQuote } = useContext(AppContext) as AppContextType;
+    const { customers, addQuote, updateQuote, setGlobalSuccess } = useContext(AppContext) as AppContextType;
 
     // Campos de cliente (pueden ser de cliente existente o potencial)
     const [customerId, setCustomerId] = useState('');
@@ -65,7 +65,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
             const lowercasedQuery = customerName.toLowerCase().trim();
             const filtered = customers.filter(c =>
                 c.name.toLowerCase().includes(lowercasedQuery)
-            ).slice(0, 5);
+            ).slice(0, 15);
             setCustomerSearchResults(filtered);
         } else {
             setCustomerSearchResults([]);
@@ -127,8 +127,10 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({ isOpen, onClose,
 
         if (quoteToEdit) {
             updateQuote(quoteToEdit.id, quoteData);
+            setGlobalSuccess('Cotización actualizada exitosamente.');
         } else {
             addQuote(quoteData);
+            setGlobalSuccess('Cotización creada exitosamente.');
         }
         onClose();
     };

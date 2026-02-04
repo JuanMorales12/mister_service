@@ -179,7 +179,9 @@ export const firebaseService = {
                 
                 let customerId: string;
                 let newCustomers = [...currentState.customers];
-                let existingCustomer = currentState.customers.find(c => c.phone === orderData.customerPhone);
+                let existingCustomer = currentState.customers.find(c =>
+                    c.phone === orderData.customerPhone && c.name.toLowerCase() === orderData.customerName.toLowerCase()
+                );
                 
                 if (existingCustomer) {
                     customerId = existingCustomer.id;

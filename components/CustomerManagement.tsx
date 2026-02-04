@@ -1,11 +1,11 @@
 
 import React, { useContext, useState, useMemo, useEffect, useRef } from 'react';
 import { AppContext, AppContextType, Customer } from '../src/types';
-import { User, Phone, Mail, MapPin, History, Wrench, Search, PlusCircle, Pencil, Upload, Download, ClipboardList, ArrowLeft } from 'lucide-react';
+import { User, Phone, Mail, MapPin, History, Wrench, Search, PlusCircle, Pencil, Trash2, Upload, Download, ClipboardList, ArrowLeft } from 'lucide-react';
 import { CustomerFormModal } from './CreateCustomerModal';
 
 export const CustomerManagement: React.FC = () => {
-    const { customers, serviceOrders, staff, calendars, addCustomer, updateCustomer, loadCustomers, maintenanceSchedules, setMode, currentUser } = useContext(AppContext) as AppContextType;
+    const { customers, serviceOrders, staff, calendars, addCustomer, updateCustomer, deleteCustomer, loadCustomers, maintenanceSchedules, setMode, currentUser, invoices, setGlobalSuccess } = useContext(AppContext) as AppContextType;
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -48,11 +48,29 @@ export const CustomerManagement: React.FC = () => {
         setIsModalOpen(true);
     };
 
+    const handleDeleteCustomer = (customer: Customer) => {
+        const hasOrders = serviceOrders.some(o => o.customerId === customer.id);
+        const hasInvoices = invoices.some(i => i.customerId === customer.id);
+        let message = `¿Estás seguro de que deseas eliminar al cliente "${customer.name}"?`;
+        if (hasOrders || hasInvoices) {
+            message = `El cliente "${customer.name}" tiene ${hasOrders ? 'órdenes de servicio' : ''}${hasOrders && hasInvoices ? ' y ' : ''}${hasInvoices ? 'facturas' : ''} asociadas. ¿Estás seguro de que deseas eliminarlo?`;
+        }
+        if (window.confirm(message)) {
+            deleteCustomer(customer.id);
+            setGlobalSuccess(`Cliente "${customer.name}" eliminado exitosamente.`);
+            if (selectedCustomer?.id === customer.id) {
+                setSelectedCustomer(null);
+            }
+        }
+    };
+
     const handleSaveCustomer = (customerData: Omit<Customer, 'id' | 'serviceHistory'>) => {
         if (customerToEdit) {
             updateCustomer(customerToEdit.id, customerData);
+            setGlobalSuccess('Cliente actualizado exitosamente.');
         } else {
             addCustomer(customerData);
+            setGlobalSuccess('Cliente creado exitosamente.');
         }
         setIsModalOpen(false);
         setCustomerToEdit(null);
@@ -233,13 +251,22 @@ export const CustomerManagement: React.FC = () => {
                                         <p className="text-slate-500">Historial del Cliente</p>
                                     </div>
                                 </div>
-                                <button 
-                                    onClick={() => handleOpenEditModal(selectedCustomer)}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-md hover:bg-slate-200"
-                                >
-                                    <Pencil size={14} />
-                                    <span>Editar</span>
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleOpenEditModal(selectedCustomer)}
+                                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-md hover:bg-slate-200"
+                                    >
+                                        <Pencil size={14} />
+                                        <span>Editar</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteCustomer(selectedCustomer)}
+                                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100"
+                                    >
+                                        <Trash2 size={14} />
+                                        <span>Eliminar</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">

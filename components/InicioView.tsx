@@ -444,8 +444,8 @@ export const InicioView: React.FC = () => {
             .map(([category, total]) => ({ category: category as ExpenseCategory, total }))
             .sort((a, b) => b.total - a.total);
 
-        // Balance neto (facturado - gastos)
-        const netBalance = invoiceStats.emittedMonth.total - totalExpensesMonth;
+        // Balance neto (cobrado - gastos)
+        const netBalance = invoiceStats.paidMonth.total - totalExpensesMonth;
 
         return {
             quotes: { total: totalQuotesValue, pending: pendingQuotesCount, trend: quotesTrend },
@@ -615,16 +615,16 @@ export const InicioView: React.FC = () => {
                         ))}
                     </select>
                 </div>
-                <div className="flex items-end gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-4">
                     <div>
-                        <p className="text-3xl font-bold text-white">{currencyFormatter.format(metrics.annualBilling.total)}</p>
+                        <p className="text-xl sm:text-3xl font-bold text-white">{currencyFormatter.format(metrics.annualBilling.total)}</p>
                         <p className="text-sm font-medium text-white/70 mt-1">{metrics.annualBilling.count} facturas emitidas</p>
                     </div>
-                    <div className="flex-1 text-right">
+                    <div className="flex-1 sm:text-right">
                         <p className="text-xs font-bold uppercase tracking-wider text-white/70 mb-1">Cobrado:</p>
-                        <p className="text-xl font-bold text-emerald-300">{currencyFormatter.format(metrics.annualBilling.paid)}</p>
+                        <p className="text-lg sm:text-xl font-bold text-emerald-300">{currencyFormatter.format(metrics.annualBilling.paid)}</p>
                         <p className="text-xs font-bold uppercase tracking-wider text-white/70 mt-2 mb-1">Pendiente:</p>
-                        <p className="text-lg font-bold text-amber-300">{currencyFormatter.format(metrics.annualBilling.total - metrics.annualBilling.paid)}</p>
+                        <p className="text-base sm:text-lg font-bold text-amber-300">{currencyFormatter.format(metrics.annualBilling.total - metrics.annualBilling.paid)}</p>
                     </div>
                 </div>
             </div>
