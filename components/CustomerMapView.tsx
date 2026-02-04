@@ -164,6 +164,11 @@ export const CustomerMapView: React.FC = () => {
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(mapInstanceRef.current);
+
+            // Forzar recálculo de dimensiones después de que el DOM se estabilice
+            setTimeout(() => {
+                mapInstanceRef.current?.invalidateSize();
+            }, 100);
         }
 
         return () => {
@@ -314,8 +319,8 @@ export const CustomerMapView: React.FC = () => {
                         )}
                     </div>
                 </div>
-                <div className="relative w-full h-[70vh] bg-slate-200">
-                    <div ref={mapContainerRef} className="rounded-md" style={{ height: '100%', width: '100%' }}></div>
+                <div className="relative w-full h-[70vh] bg-slate-200 rounded-md overflow-hidden">
+                    <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }}></div>
                     
                     {techniciansWithRoutes.length > 0 && (
                         <div className="absolute top-2 right-2 bg-white bg-opacity-80 p-2 rounded-md shadow-md z-[1000]">
