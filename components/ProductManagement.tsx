@@ -6,26 +6,10 @@ import { ProductFormModal } from './ProductFormModal';
 import { formatCurrency } from '../src/utils';
 
 export const ProductManagement: React.FC = () => {
-    const { products, deleteProduct, setMode, invoices } = useContext(AppContext) as AppContextType;
+    const { products, deleteProduct, setMode } = useContext(AppContext) as AppContextType;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState<Product | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-
-    // Calcular cantidad reservada por facturas pendientes (no pagadas)
-    const getReservedQuantity = (productId: string): number => {
-        return invoices
-            .filter(inv => inv.status !== 'Pagada' && inv.status !== 'Anulada')
-            .reduce((total, inv) => {
-                const item = inv.items.find(i => i.productId === productId);
-                return total + (item?.quantity || 0);
-            }, 0);
-    };
-
-    // Stock disponible = stock actual menos reservado
-    const getAvailableStock = (product: Product): number => {
-        const reserved = getReservedQuantity(product.id);
-        return Math.max(0, product.stock - reserved);
-    };
 
     // Cantidad inicial (fija, no cambia)
     const getInitialStock = (product: Product): number => {
@@ -107,9 +91,6 @@ export const ProductManagement: React.FC = () => {
                         <tbody>
                             {filteredProducts.length > 0 ? (
                                 filteredProducts.map(product => {
-                                    const availableStock = getAvailableStock(product);
-                                    const reserved = getReservedQuantity(product.id);
-                                    const isLowStock = availableStock <= 5 && availableStock > 0;
                                     return (
                                         <tr key={product.id} className="bg-white border-b hover:bg-slate-50">
                                             <td className="px-4 py-3 font-medium text-slate-900">{product.code}</td>
@@ -135,7 +116,6 @@ export const ProductManagement: React.FC = () => {
                                                     </span>
                                                     {product.stock <= 5 && product.stock > 0 && <AlertTriangle size={14} className="text-amber-500" title="Stock bajo"/>}
                                                 </div>
-                                                {reserved > 0 && <div className="text-xs text-slate-400 mt-1">({reserved} reserv.)</div>}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${

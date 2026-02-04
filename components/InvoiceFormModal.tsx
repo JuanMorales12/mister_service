@@ -25,6 +25,7 @@ export const InvoiceFormModal: React.FC = () => {
         setInvoiceToDuplicate,
         addCustomer,
         updateCustomer,
+        setGlobalSuccess,
     } = useContext(AppContext) as AppContextType;
     
     const [customer, setCustomer] = useState<Customer | null>(null);
@@ -114,8 +115,8 @@ export const InvoiceFormModal: React.FC = () => {
           const searchPhone = customerSearchQuery.replace(/\D/g, '');
           const filtered = customers.filter(c =>
             c.name.toLowerCase().includes(lowercasedQuery) ||
-            (searchPhone && c.phone.replace(/\D/g, '').includes(searchPhone))
-          ).slice(0, 5);
+            (searchPhone.length >= 3 && c.phone.replace(/\D/g, '').includes(searchPhone))
+          ).slice(0, 15);
           setCustomerSearchResults(filtered);
         } else {
           setCustomerSearchResults([]);
@@ -206,8 +207,10 @@ export const InvoiceFormModal: React.FC = () => {
             if (invoiceToEdit) {
                 await updateInvoice(invoiceToEdit.id, invoiceData);
                 savedInvoiceId = invoiceToEdit.id;
+                setGlobalSuccess('Factura actualizada exitosamente.');
             } else {
                 savedInvoiceId = await addInvoice(invoiceData);
+                setGlobalSuccess('Factura creada exitosamente.');
             }
 
             const finalInvoice: Invoice = {

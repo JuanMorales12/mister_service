@@ -1,18 +1,21 @@
 
 import React, { useState, useContext, useMemo } from 'react';
 import { AppContext, AppContextType, Quote } from '../src/types';
-import { PlusCircle, FileSpreadsheet, Search, Edit, Trash2, FileText, Wrench, User, ArrowLeft, CheckCircle, Printer } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, Search, Edit, Trash2, FileText, Wrench, User, ArrowLeft, CheckCircle, Printer, Loader2 } from 'lucide-react';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { formatCurrency } from '../src/utils';
 import { QuoteFormModal } from './QuoteFormModal';
+import { generatePDF } from '../src/pdfGenerator';
+import { firebaseService } from '../services/firebaseService';
 
 export const QuoteView: React.FC = () => {
-    const { quotes, customers, staff, setQuoteToConvertToInvoice, goHome, setMode, deleteQuote, updateQuote, companyInfo, setQuoteToPrint } = useContext(AppContext) as AppContextType;
+    const { quotes, customers, staff, setQuoteToConvertToInvoice, goHome, setMode, deleteQuote, updateQuote, companyInfo, setQuoteToPrint, setGlobalError } = useContext(AppContext) as AppContextType;
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [quoteToEdit, setQuoteToEdit] = useState<Quote | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<Quote['status'] | 'Todos'>('Todos');
     const [processingQuoteId, setProcessingQuoteId] = useState<string | null>(null);
+    const [whatsappLoadingId, setWhatsappLoadingId] = useState<string | null>(null);
 
     const handleOpenCreateModal = () => {
         setQuoteToEdit(null);
@@ -135,46 +138,198 @@ export const QuoteView: React.FC = () => {
         setQuoteToPrint({ quote, customer: customerData });
     };
 
-    // Función para compartir por WhatsApp
-    const handleShareWhatsApp = (quote: Quote) => {
-        // Usar datos de la cotización directamente
+    // Función para compartir por WhatsApp con PDF
+    const handleShareWhatsAppWithPDF = async (quote: Quote) => {
         const customerName = quote.customerName || 'Cliente potencial';
         const customerPhone = quote.customerPhone || '';
-        const itemsList = quote.items.map(item => `• ${item.quantity}x ${item.description}: RD$ ${formatCurrency(item.quantity * item.sellPrice)}`).join('\n');
+        const existingCustomer = quote.customerId ? customers.find(c => c.id === quote.customerId) : null;
 
-        const message = `*${companyInfo.name}*
+        setWhatsappLoadingId(quote.id);
+        const hiddenContainer = document.createElement('div');
+        hiddenContainer.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;';
+        document.body.appendChild(hiddenContainer);
+
+        try {
+            const validUntil = new Date(quote.date);
+            validUntil.setDate(validUntil.getDate() + 15);
+
+            hiddenContainer.innerHTML = `
+                <style>
+                    .hidden-quote-sheet {
+                        background: white;
+                        width: 210mm;
+                        padding: 10mm;
+                        display: flex;
+                        flex-direction: column;
+                        font-family: system-ui, -apple-system, sans-serif;
+                        font-size: 0.875rem;
+                        color: #1e293b;
+                    }
+                    .hidden-quote-sheet * { box-sizing: border-box; }
+                    .hidden-quote-sheet table { width: 100%; border-collapse: collapse; }
+                    .hidden-quote-sheet th { padding: 4px; text-align: left; }
+                    .hidden-quote-sheet td { padding: 4px; }
+                    .hidden-quote-sheet .text-right { text-align: right; }
+                    .hidden-quote-sheet .font-bold { font-weight: 700; }
+                    .hidden-quote-sheet .font-semibold { font-weight: 600; }
+                    .hidden-quote-sheet .font-mono { font-family: monospace; }
+                    .hidden-quote-sheet .border-b { border-bottom: 1px solid #e2e8f0; }
+                    .hidden-quote-sheet .border-t { border-top: 1px solid #e2e8f0; }
+                    .hidden-quote-sheet .border-t-2 { border-top: 2px solid #334155; }
+                    .hidden-quote-sheet .border-b-2 { border-bottom: 2px solid #334155; }
+                    .hidden-quote-sheet .bg-slate-700 { background-color: #334155; color: white; }
+                    .hidden-quote-sheet .bg-slate-50 { background-color: #f8fafc; }
+                    .hidden-quote-sheet .bg-amber-50 { background-color: #fffbeb; }
+                    .hidden-quote-sheet .border-amber-200 { border-color: #fde68a; }
+                    .hidden-quote-sheet .text-amber-600 { color: #d97706; }
+                    .hidden-quote-sheet .text-amber-800 { color: #92400e; }
+                    .hidden-quote-sheet .text-sky-600 { color: #0284c7; }
+                    .hidden-quote-sheet .text-slate-500 { color: #64748b; }
+                    .hidden-quote-sheet .text-slate-600 { color: #475569; }
+                    .hidden-quote-sheet .text-slate-700 { color: #334155; }
+                    .hidden-quote-sheet .text-slate-800 { color: #1e293b; }
+                    .hidden-quote-sheet .rounded-md { border-radius: 0.375rem; }
+                    .hidden-quote-sheet .border { border: 1px solid #e2e8f0; }
+                    .hidden-quote-sheet .p-2 { padding: 0.5rem; }
+                    .hidden-quote-sheet .pb-2 { padding-bottom: 0.5rem; }
+                    .hidden-quote-sheet .mt-1 { margin-top: 0.25rem; }
+                    .hidden-quote-sheet .mt-3 { margin-top: 0.75rem; }
+                    .hidden-quote-sheet .mt-6 { margin-top: 1.5rem; }
+                    .hidden-quote-sheet .mb-1 { margin-bottom: 0.25rem; }
+                    .hidden-quote-sheet .my-3 { margin-top: 0.75rem; margin-bottom: 0.75rem; }
+                    .hidden-quote-sheet .pt-1 { padding-top: 0.25rem; }
+                    .hidden-quote-sheet .pt-4 { padding-top: 1rem; }
+                    .hidden-quote-sheet .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+                    .hidden-quote-sheet .flex-between { display: flex; justify-content: space-between; }
+                    .hidden-quote-sheet .flex-end { display: flex; justify-content: flex-end; }
+                    .hidden-quote-sheet .w-64 { width: 16rem; }
+                    .hidden-quote-sheet .space-y > * + * { margin-top: 0.25rem; }
+                    .hidden-quote-sheet .header-flex { display: flex; justify-content: space-between; align-items: flex-start; }
+                    .hidden-quote-sheet .items-end { display: flex; flex-direction: column; align-items: flex-end; }
+                    .hidden-quote-sheet .logo { height: 4rem; width: 4rem; object-fit: contain; margin-bottom: 0.25rem; }
+                    .hidden-quote-sheet .text-2xl { font-size: 1.5rem; }
+                    .hidden-quote-sheet .text-xl { font-size: 1.25rem; }
+                    .hidden-quote-sheet .text-sm { font-size: 0.875rem; }
+                    .hidden-quote-sheet .text-center { text-align: center; }
+                    .hidden-quote-sheet .break-all { word-break: break-all; }
+                </style>
+                <div id="quote-whatsapp-hidden-content" class="hidden-quote-sheet">
+                    <header class="header-flex pb-2 border-b-2">
+                        <div>
+                            <h1 class="text-xl font-bold text-slate-800">${companyInfo.name}</h1>
+                            <p>${companyInfo.address}</p>
+                            <p>Tel: ${companyInfo.phone} / WhatsApp: ${companyInfo.whatsapp}</p>
+                            <p>${companyInfo.email}</p>
+                        </div>
+                        <div class="items-end text-right">
+                            ${companyInfo.logoUrl ? `<img src="${companyInfo.logoUrl}" alt="Logo" class="logo" />` : ''}
+                            <h2 class="text-2xl font-bold text-amber-600">COTIZACIÓN</h2>
+                            <p class="mt-1"><b>Fecha:</b> ${new Date(quote.date).toLocaleDateString('es-ES')}</p>
+                        </div>
+                    </header>
+                    <section class="my-3 grid-2">
+                        <div class="p-2 border rounded-md bg-slate-50">
+                            <h3 class="font-semibold text-slate-700">Cliente:</h3>
+                            <p class="font-bold text-sm">${customerName}</p>
+                            ${customerPhone ? `<p>Tel: ${customerPhone}</p>` : ''}
+                            ${existingCustomer?.email ? `<p class="break-all">Email: ${existingCustomer.email}</p>` : ''}
+                            ${existingCustomer?.rnc ? `<p>RNC: ${existingCustomer.rnc}</p>` : ''}
+                        </div>
+                        <div class="p-2 border rounded-md bg-slate-50 text-right">
+                            <p><b>Cotización No.:</b> <span class="font-mono">${quote.quoteNumber}</span></p>
+                            ${companyInfo.rnc ? `<p><b>RNC:</b> <span class="font-mono">${companyInfo.rnc}</span></p>` : ''}
+                            <p><b>Estado:</b> ${quote.status}</p>
+                            <p class="text-amber-600 font-semibold"><b>Válida hasta:</b> ${validUntil.toLocaleDateString('es-ES')}</p>
+                        </div>
+                    </section>
+                    <section>
+                        <table>
+                            <thead class="bg-slate-700">
+                                <tr>
+                                    <th style="padding:4px;text-align:left;">Cant.</th>
+                                    <th style="padding:4px;text-align:left;">Descripción</th>
+                                    <th style="padding:4px;text-align:right;">Precio Unit.</th>
+                                    <th style="padding:4px;text-align:right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${quote.items.map(item => `
+                                <tr class="border-b">
+                                    <td style="padding:4px;">${item.quantity}</td>
+                                    <td style="padding:4px;">${item.description}</td>
+                                    <td style="padding:4px;text-align:right;">RD$ ${formatCurrency(item.sellPrice)}</td>
+                                    <td style="padding:4px;text-align:right;">RD$ ${formatCurrency(item.quantity * item.sellPrice)}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </section>
+                    <section class="mt-3 flex-end">
+                        <div class="w-64 space-y">
+                            <div class="flex-between"><span>Subtotal:</span> <span>RD$ ${formatCurrency(quote.subtotal)}</span></div>
+                            ${quote.discount > 0 ? `<div class="flex-between"><span>Descuento:</span> <span>- RD$ ${formatCurrency(quote.discount)}</span></div>` : ''}
+                            <div class="flex-between"><span>ITBIS (${quote.isTaxable ? '18%' : '0%'}):</span> <span>RD$ ${formatCurrency(quote.taxes)}</span></div>
+                            <div class="flex-between font-bold border-t-2 mt-1 pt-1" style="font-size:0.875rem;">
+                                <span>Total General:</span>
+                                <span>RD$ ${formatCurrency(quote.total)}</span>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="mt-3 p-2 border rounded-md bg-amber-50 border-amber-200">
+                        <p class="text-amber-800">
+                            <b>Nota:</b> Esta cotización tiene una validez de 15 días a partir de la fecha de emisión.
+                            Los precios están sujetos a cambios después de este período.
+                        </p>
+                    </section>
+                    <footer class="mt-6 pt-4 text-center text-slate-500 border-t">
+                        <p>Gracias por su preferencia.</p>
+                        <p>Esta cotización no representa un compromiso de venta.</p>
+                    </footer>
+                </div>
+            `;
+
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            const pdfBlob = await generatePDF('quote-whatsapp-hidden-content', `cotizacion-${quote.quoteNumber}`);
+            const file = new File([pdfBlob], `cotizacion-${quote.quoteNumber}-${Date.now()}.pdf`, { type: 'application/pdf' });
+            const pdfUrl = await firebaseService.uploadFile(file, `quotes/${quote.quoteNumber}-${Date.now()}.pdf`);
+
+            if (!pdfUrl) {
+                throw new Error('No se pudo subir el PDF. Intenta nuevamente.');
+            }
+
+            const message = `*${companyInfo.name}*
 ━━━━━━━━━━━━━━━━━
 *COTIZACIÓN #${quote.quoteNumber}*
 Fecha: ${new Date(quote.date).toLocaleDateString('es-ES')}
+Válida hasta: ${validUntil.toLocaleDateString('es-ES')}
 ━━━━━━━━━━━━━━━━━
 
 *Cliente:* ${customerName}
-${customerPhone ? `*Tel:* ${customerPhone}` : ''}
+*Total:* RD$ ${formatCurrency(quote.total)}
 
-*Detalle:*
-${itemsList}
+📄 *Ver/Descargar Cotización PDF:*
+${pdfUrl}
 
 ━━━━━━━━━━━━━━━━━
-*Subtotal:* RD$ ${formatCurrency(quote.subtotal)}
-${quote.discount > 0 ? `*Descuento:* -${quote.discount}%` : ''}
-*ITBIS (${quote.isTaxable ? '18%' : '0%'}):* RD$ ${formatCurrency(quote.taxes)}
-*TOTAL:* RD$ ${formatCurrency(quote.total)}
-━━━━━━━━━━━━━━━━━
-
-_Esta cotización tiene validez de 15 días._
-
 ${companyInfo.phone ? `Tel: ${companyInfo.phone}` : ''}
 ${companyInfo.email ? `Email: ${companyInfo.email}` : ''}
 
 _Gracias por su preferencia_`;
 
-        const phoneNumber = customerPhone.replace(/\D/g, '');
-        const encodedMessage = encodeURIComponent(message);
-        const whatsappUrl = phoneNumber
-            ? `https://wa.me/${phoneNumber.startsWith('1') || phoneNumber.startsWith('809') || phoneNumber.startsWith('829') || phoneNumber.startsWith('849') ? phoneNumber : '1' + phoneNumber}?text=${encodedMessage}`
-            : `https://wa.me/?text=${encodedMessage}`;
+            const phoneNumber = customerPhone.replace(/\D/g, '');
+            const encodedMessage = encodeURIComponent(message);
+            const whatsappUrl = phoneNumber
+                ? `https://wa.me/${phoneNumber.startsWith('1') || phoneNumber.startsWith('809') || phoneNumber.startsWith('829') || phoneNumber.startsWith('849') ? phoneNumber : '1' + phoneNumber}?text=${encodedMessage}`
+                : `https://wa.me/?text=${encodedMessage}`;
 
-        window.open(whatsappUrl, '_blank');
+            window.open(whatsappUrl, '_blank');
+        } catch (error) {
+            console.error('Error generating PDF for WhatsApp:', error);
+            setGlobalError('Error al generar PDF: ' + (error as Error).message);
+        } finally {
+            document.body.removeChild(hiddenContainer);
+            setWhatsappLoadingId(null);
+        }
     };
 
     return (
@@ -302,11 +457,12 @@ _Gracias por su preferencia_`;
                                                 <Printer size={16} />
                                             </button>
                                             <button
-                                                onClick={() => handleShareWhatsApp(quote)}
-                                                className="p-2 text-emerald-600 bg-emerald-100 hover:bg-emerald-200 rounded-full"
+                                                onClick={() => handleShareWhatsAppWithPDF(quote)}
+                                                disabled={whatsappLoadingId === quote.id}
+                                                className="p-2 text-emerald-600 bg-emerald-100 hover:bg-emerald-200 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Enviar por WhatsApp"
                                             >
-                                                <WhatsAppIcon size={16} />
+                                                {whatsappLoadingId === quote.id ? <Loader2 size={16} className="animate-spin" /> : <WhatsAppIcon size={16} />}
                                             </button>
                                             <button
                                                 onClick={() => handleConvertToInvoice(quote)}

@@ -306,6 +306,7 @@ export interface LocalAppState {
   googleAuth: GoogleAuthState;
   currentUser: Staff | null;
   globalError: string | null;
+  globalSuccess: string | null;
   orderToConvertToInvoice: ServiceOrder | null;
   quoteToConvertToInvoice: Quote | null;
   invoiceToEdit: Invoice | null;
@@ -322,6 +323,7 @@ export interface AppContextType extends AppState {
   setMode: (mode: AppMode) => void;
   goHome: () => void;
   setGlobalError: (error: string | null) => void;
+  setGlobalSuccess: (message: string | null) => void;
   signOut: () => void;
   addServiceOrder: (order: Omit<ServiceOrder, 'id' | 'isGoogleSynced' | 'title' | 'status' | 'customerId' | 'createdById' | 'confirmedById' | 'attendedById' | 'isCheckupOnly' | 'archiveReason' | 'serviceOrderNumber' | 'cancellationReason' | 'createdAt' | 'history' | 'cancelledById' | 'rescheduledCount' | 'completionPhotoUrl' | 'completionLatitude' | 'completionLongitude'> & { customerEmail: string }) => Promise<void>;
   confirmServiceOrder: (orderId: string, updatedData: Partial<ServiceOrder>) => Promise<void>;
@@ -338,6 +340,7 @@ export interface AppContextType extends AppState {
   deleteCalendar: (calendarId: string) => Promise<void>;
   addCustomer: (customerData: Omit<Customer, 'id' | 'serviceHistory' | 'createdById'>) => Promise<Customer | undefined>;
   updateCustomer: (customerId: string, customerData: Omit<Customer, 'id' | 'serviceHistory' | 'createdById'>) => Promise<void>;
+  deleteCustomer: (customerId: string) => Promise<void>;
   loadCustomers: (customers: Customer[]) => Promise<void>;
   signInToGoogle: () => void;
   signOutFromGoogle: () => void;

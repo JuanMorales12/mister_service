@@ -60,7 +60,7 @@ export const WorkshopEquipmentFormModal: React.FC<WorkshopEquipmentFormModalProp
         setCustomerSearchQuery(e.target.value);
         setCustomerId('');
         if (e.target.value.trim()) {
-            setCustomerSearchResults(customers.filter(c => c.name.toLowerCase().includes(e.target.value.toLowerCase())).slice(0, 5));
+            setCustomerSearchResults(customers.filter(c => c.name.toLowerCase().includes(e.target.value.toLowerCase())).slice(0, 15));
         } else {
             setCustomerSearchResults([]);
         }

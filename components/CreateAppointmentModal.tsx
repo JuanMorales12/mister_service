@@ -2,7 +2,7 @@
 
 import React, { useState, useContext, useMemo, useEffect, useCallback } from 'react';
 import { AppContext, AppContextType, Customer } from '../src/types';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { AddressAutocompleteInput } from './AddressAutocompleteInput';
 
 interface CreateAppointmentModalProps {
@@ -13,7 +13,7 @@ interface CreateAppointmentModalProps {
 }
 
 export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
-  const { staff, calendars, addServiceOrder, customers, serviceOrders } = useContext(AppContext) as AppContextType;
+  const { staff, calendars, addServiceOrder, customers, serviceOrders, setGlobalSuccess } = useContext(AppContext) as AppContextType;
   
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -33,6 +33,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const assignableStaff = useMemo(() => staff.filter(s => {
     if (!['tecnico', 'coordinador', 'administrador'].includes(s.role)) return false;
@@ -106,10 +107,11 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
   useEffect(() => {
     if (customerSearchQuery.trim() && !selectedCustomerId) {
       const lowercasedQuery = customerSearchQuery.toLowerCase();
-      const filtered = customers.filter(customer => 
-        customer.name.toLowerCase().includes(lowercasedQuery) || 
-        customer.phone.replace(/\D/g, '').includes(customerSearchQuery.replace(/\D/g, ''))
-      ).slice(0, 5);
+      const digitsOnly = customerSearchQuery.replace(/\D/g, '');
+      const filtered = customers.filter(customer =>
+        customer.name.toLowerCase().includes(lowercasedQuery) ||
+        (digitsOnly.length >= 3 && customer.phone.replace(/\D/g, '').includes(digitsOnly))
+      ).slice(0, 15);
       setCustomerSearchResults(filtered);
     } else {
       setCustomerSearchResults([]);
@@ -176,7 +178,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
     setLongitude(details.longitude);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName || !customerPhone || !customerAddress || !applianceType || !issueDescription || !calendarId || !appointmentDate || !appointmentTime) {
       alert("Por favor, completa todos los campos.");
@@ -186,7 +188,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
     const start = new Date(`${appointmentDate}T${appointmentTime}`);
     const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour duration
 
-    const isSlotOccupied = serviceOrders.some(o => 
+    const isSlotOccupied = serviceOrders.some(o =>
         o.calendarId === calendarId &&
         o.status !== 'Cancelado' &&
         o.start &&
@@ -198,22 +200,28 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
         return;
     }
 
-    const orderData = {
-      customerName,
-      customerPhone,
-      customerEmail,
-      customerAddress,
-      latitude,
-      longitude,
-      applianceType,
-      issueDescription,
-      start,
-      end,
-      calendarId
-    };
+    setIsSaving(true);
+    try {
+      const orderData = {
+        customerName,
+        customerPhone,
+        customerEmail,
+        customerAddress,
+        latitude,
+        longitude,
+        applianceType,
+        issueDescription,
+        start,
+        end,
+        calendarId
+      };
 
-    addServiceOrder(orderData);
-    onSave();
+      await addServiceOrder(orderData);
+      setGlobalSuccess('Orden de servicio creada exitosamente.');
+      onSave();
+    } finally {
+      setIsSaving(false);
+    }
   };
   
   if (!isOpen) {
@@ -247,19 +255,26 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
                     placeholder="Buscar o crear cliente por nombre o teléfono..."
                     className="w-full input-style"
                 />
-                {isSearchFocused && customerSearchResults.length > 0 && (
+                {isSearchFocused && customerSearchQuery.trim() && !selectedCustomerId && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        {customerSearchResults.map(customer => (
-                            <button
-                                type="button"
-                                key={customer.id}
-                                onMouseDown={() => handleCustomerSelect(customer)}
-                                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-sky-100"
-                            >
-                                <p className="font-semibold">{customer.name}</p>
-                                <p className="text-xs text-slate-500">{customer.phone}</p>
-                            </button>
-                        ))}
+                        {customerSearchResults.length > 0 ? (
+                            customerSearchResults.map(customer => (
+                                <button
+                                    type="button"
+                                    key={customer.id}
+                                    onMouseDown={() => handleCustomerSelect(customer)}
+                                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-sky-100"
+                                >
+                                    <p className="font-semibold">{customer.name}</p>
+                                    <p className="text-xs text-slate-500">{customer.phone}</p>
+                                </button>
+                            ))
+                        ) : (
+                            <div className="px-4 py-3 text-sm text-slate-500">
+                                <p>No se encontraron clientes con "{customerSearchQuery}".</p>
+                                <p className="mt-1 text-sky-600 font-medium">Completa los datos abajo para crear un cliente nuevo.</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -358,8 +373,8 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200">
               Cancelar
             </button>
-            <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700">
-              Guardar Orden de Servicio
+            <button type="submit" disabled={isSaving} className="px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+              {isSaving ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : 'Guardar Orden de Servicio'}
             </button>
           </div>
         </form>
