@@ -726,10 +726,25 @@ const updateServiceOrderStatus = async (orderId: string, status: ServiceOrderSta
     if (!syncedState || !localState) return;
     try {
         const order = syncedState.serviceOrders.find(o => o.id === orderId);
+        if (!order) return;
+
+        const updatedOrder = {
+            ...order,
+            status,
+            history: [
+                ...(order.history || []),
+                {
+                    action: 'Estado Cambiado' as const,
+                    timestamp: new Date(),
+                    userId: localState.currentUser!.id,
+                    details: `${order.status} → ${status}`
+                }
+            ]
+        };
 
         const newState = {
             ...syncedState,
-            serviceOrders: syncedState.serviceOrders.map(o => o.id === orderId ? { ...o, status } : o)
+            serviceOrders: syncedState.serviceOrders.map(o => o.id === orderId ? updatedOrder : o)
         };
         await firebaseService.saveState(newState);
         
