@@ -1,7 +1,7 @@
 
 import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { AppContext, AppContextType, ServiceOrder, ServiceOrderStatus } from '../src/types';
-import { X, Edit, Phone, MapPin, Wrench, User, Calendar as CalendarIcon, Save, Info, Search, Clock, History, RefreshCw, Camera, CheckCircle, Loader2, FileSpreadsheet, FileText, DollarSign } from 'lucide-react';
+import { X, Edit, Phone, MapPin, Wrench, User, Calendar as CalendarIcon, Save, Info, Search, Clock, History, RefreshCw, Camera, CheckCircle, Loader2, FileSpreadsheet, FileText, DollarSign, AlertCircle, Smartphone } from 'lucide-react';
 import { CompleteOrderModal } from './CompleteOrderModal';
 import { AddressAutocompleteInput } from './AddressAutocompleteInput';
 import { RecordPaymentModal } from './RecordPaymentModal';
@@ -29,6 +29,17 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [addressInputKey, setAddressInputKey] = useState(0);
+  const [mobileOnlyAlert, setMobileOnlyAlert] = useState(false);
+
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  const handleCompleteClick = () => {
+    if (!isMobile) {
+      setMobileOnlyAlert(true);
+      return;
+    }
+    setIsCompleteModalOpen(true);
+  };
 
   // Editable fields state
   const [applianceType, setApplianceType] = useState('');
@@ -193,7 +204,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   if (!isOpen || !order) return null;
 
   const isTechnicianUser = currentUser?.role === 'tecnico';
-  const canEdit = !isTechnicianUser || ['Pendiente', 'En Proceso', 'Garantía'].includes(order.status);
+  const canEdit = !isTechnicianUser;
   const canComplete = isTechnicianUser && ['Pendiente', 'En Proceso', 'Garantía'].includes(order.status);
   const canManagePayment = (currentUser?.role === 'administrador' || currentUser?.role === 'secretaria') && associatedInvoice;
 
@@ -212,6 +223,16 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
           </header>
 
           <main className="space-y-4 py-4 flex-grow overflow-y-auto pr-2">
+            {mobileOnlyAlert && (
+              <div className="bg-amber-50 border border-amber-300 rounded-md p-4 flex items-start gap-3">
+                <Smartphone size={20} className="text-amber-600 flex-shrink-0 mt-0.5"/>
+                <div>
+                  <p className="font-medium text-amber-800">Solo disponible en dispositivos móviles</p>
+                  <p className="text-sm text-amber-700 mt-1">Para completar una orden de servicio, debe usar su teléfono o tablet. Se requiere cámara y ubicación GPS.</p>
+                </div>
+                <button onClick={() => setMobileOnlyAlert(false)} className="text-amber-500 hover:text-amber-700 flex-shrink-0"><X size={16}/></button>
+              </div>
+            )}
             {/* Customer Info */}
             <section>
               <h3 className="text-lg font-semibold text-slate-600 mb-2">Cliente</h3>
@@ -234,7 +255,17 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                       />
                     </div>
                   ) : (
-                    <p className="flex items-start gap-2"><MapPin size={14} className="mt-0.5"/> {order.customerAddress}</p>
+                    <a
+                      href={order.latitude && order.longitude
+                        ? `https://www.google.com/maps/search/?api=1&query=${order.latitude},${order.longitude}`
+                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.customerAddress)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-2 text-sky-600 hover:underline"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <MapPin size={14} className="mt-0.5 flex-shrink-0"/> {order.customerAddress}
+                    </a>
                   )}
                 </div>
               </div>
@@ -298,7 +329,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                <div className="p-3 bg-slate-50 border rounded-md space-y-3">
                     <div>
                         <label className="label-style">Notas de Servicio (Trabajo Realizado)</label>
-                        <textarea value={serviceNotes} onChange={e => setServiceNotes(e.target.value)} readOnly={!isEditing && !isTechnicianUser} rows={4} className="input-style" placeholder={isEditing || isTechnicianUser ? 'Añade notas sobre el trabajo realizado...' : 'Sin notas'}/>
+                        <textarea value={serviceNotes} onChange={e => setServiceNotes(e.target.value)} readOnly={!isEditing} rows={4} className="input-style" placeholder={isEditing ? 'Añade notas sobre el trabajo realizado...' : 'Sin notas'}/>
                     </div>
                     {order.history && order.history.length > 0 && (
                         <div>
@@ -402,7 +433,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                 ) : (
                     <>
                         {canEdit && <button onClick={() => { setIsEditing(true); setAddressInputKey(prev => prev + 1); }} className="px-4 py-2 text-sm font-medium rounded-md bg-slate-200 hover:bg-slate-300 flex items-center gap-2"><Edit size={16}/> Editar</button>}
-                        {canComplete && <button onClick={() => setIsCompleteModalOpen(true)} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-green-600 hover:bg-green-700 flex items-center gap-2"><CheckCircle size={16}/> Completar</button>}
+                        {canComplete && <button onClick={handleCompleteClick} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-green-600 hover:bg-green-700 flex items-center gap-2"><CheckCircle size={16}/> Completar</button>}
                     </>
                 )}
             </div>

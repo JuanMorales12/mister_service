@@ -81,8 +81,12 @@ const StatusDropdown: React.FC<{ orderId: string, currentStatus: ServiceOrderSta
 
 export const MyOrdersView: React.FC = () => {
     const { serviceOrders, currentUser, staff, setMode, goHome } = useContext(AppContext) as AppContextType;
-    const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [orderToComplete, setOrderToComplete] = useState<ServiceOrder | null>(null);
+    const selectedOrder = useMemo(() => {
+        if (!selectedOrderId) return null;
+        return serviceOrders.find(o => o.id === selectedOrderId) || null;
+    }, [serviceOrders, selectedOrderId]);
     const myOrders = useMemo(() => {
         if (!currentUser || !currentUser.calendarId) return [];
         
@@ -129,7 +133,7 @@ export const MyOrdersView: React.FC = () => {
                             return (
                             <div 
                                 key={order.id} 
-                                onClick={() => setSelectedOrder(order)}
+                                onClick={() => setSelectedOrderId(order.id)}
                                 className="p-4 border-l-4 border-sky-500 rounded-r-md bg-slate-50 cursor-pointer hover:bg-slate-100"
                             >
                                 <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2">
@@ -145,7 +149,13 @@ export const MyOrdersView: React.FC = () => {
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2 self-start sm:self-center">
-                                        <StatusDropdown orderId={order.id} currentStatus={order.status} onCompleteClick={() => setOrderToComplete(order)} />
+                                        {currentUser?.role === 'tecnico' ? (
+                                            <span className={`inline-flex items-center w-32 justify-center text-xs font-medium py-1.5 px-3 rounded-full ${statusDisplayConfig[order.status]?.bg || 'bg-slate-500'} ${statusDisplayConfig[order.status]?.text || 'text-white'}`}>
+                                                {order.status}
+                                            </span>
+                                        ) : (
+                                            <StatusDropdown orderId={order.id} currentStatus={order.status} onCompleteClick={() => setOrderToComplete(order)} />
+                                        )}
                                     </div>
                                 </div>
                                 <div className="mt-2 pt-2 border-t border-slate-200 space-y-2">
@@ -173,7 +183,7 @@ export const MyOrdersView: React.FC = () => {
                 )}
                 <ServiceOrderDetailsModal
                     isOpen={!!selectedOrder}
-                    onClose={() => setSelectedOrder(null)}
+                    onClose={() => setSelectedOrderId(null)}
                     order={selectedOrder}
                 />
                 {orderToComplete && (
