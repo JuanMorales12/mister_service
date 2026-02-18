@@ -1,5 +1,5 @@
 
-import React, { useState, useContext, useMemo, useEffect } from 'react';
+import React, { useState, useContext, useMemo, useEffect, useCallback } from 'react';
 import { AppContext, AppContextType, ServiceOrder, ServiceOrderStatus } from '../src/types';
 import { X, Edit, Phone, MapPin, Wrench, User, Calendar as CalendarIcon, Save, Info, Search, Clock, History, RefreshCw, Camera, CheckCircle, Loader2, FileSpreadsheet, FileText, DollarSign, AlertCircle, Smartphone } from 'lucide-react';
 import { CompleteOrderModal } from './CompleteOrderModal';
@@ -28,7 +28,6 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [addressInputKey, setAddressInputKey] = useState(0);
   const [mobileOnlyAlert, setMobileOnlyAlert] = useState(false);
 
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -201,6 +200,12 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
     }
   };
 
+  const handlePlaceSelected = useCallback((details: { address: string; latitude?: number; longitude?: number }) => {
+    setCustomerAddress(details.address);
+    setLatitude(details.latitude);
+    setLongitude(details.longitude);
+  }, []);
+
   if (!isOpen || !order) return null;
 
   const isTechnicianUser = currentUser?.role === 'tecnico';
@@ -244,14 +249,10 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                     <div className="mt-2">
                       <label className="label-style flex items-center gap-2 mb-1"><MapPin size={14}/> Dirección</label>
                       <AddressAutocompleteInput
-                        key={`address-${order.id}-${addressInputKey}`}
+                        key={`address-${order.id}`}
                         value={customerAddress}
                         onChange={setCustomerAddress}
-                        onPlaceSelected={(details) => {
-                          setCustomerAddress(details.address);
-                          setLatitude(details.latitude);
-                          setLongitude(details.longitude);
-                        }}
+                        onPlaceSelected={handlePlaceSelected}
                       />
                     </div>
                   ) : (
@@ -432,7 +433,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                     </>
                 ) : (
                     <>
-                        {canEdit && <button onClick={() => { setIsEditing(true); setAddressInputKey(prev => prev + 1); }} className="px-4 py-2 text-sm font-medium rounded-md bg-slate-200 hover:bg-slate-300 flex items-center gap-2"><Edit size={16}/> Editar</button>}
+                        {canEdit && <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium rounded-md bg-slate-200 hover:bg-slate-300 flex items-center gap-2"><Edit size={16}/> Editar</button>}
                         {canComplete && <button onClick={handleCompleteClick} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-green-600 hover:bg-green-700 flex items-center gap-2"><CheckCircle size={16}/> Completar</button>}
                     </>
                 )}
@@ -452,7 +453,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
         .input-style { display: block; width: 100%; padding: 0.5rem 0.75rem; background-color: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; }
         .input-style:read-only { background-color: #f1f5f9; cursor: not-allowed; }
         .label-style { display: block; text-sm font-medium text-slate-500; }
-        .pac-container { z-index: 10000 !important; }
+        .pac-container { z-index: 10000 !important; pointer-events: auto !important; }
       `}</style>
     </>
   );
