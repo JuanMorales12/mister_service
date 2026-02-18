@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 
 declare global {
   interface Window {
@@ -16,14 +16,14 @@ interface AddressAutocompleteInputProps {
 export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({ value, onChange, onPlaceSelected, required }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<any>(null);
+  const onPlaceSelectedRef = useRef(onPlaceSelected);
+
+  // Keep the ref in sync with the latest callback without re-initializing autocomplete
+  useEffect(() => {
+    onPlaceSelectedRef.current = onPlaceSelected;
+  }, [onPlaceSelected]);
 
   useEffect(() => {
-    // Clean up any existing autocomplete instance first
-    if (autocompleteRef.current && window.google && window.google.maps && inputRef.current) {
-      window.google.maps.event.clearInstanceListeners(inputRef.current);
-      autocompleteRef.current = null;
-    }
-
     const initializeAutocomplete = () => {
       if (window.google && window.google.maps && window.google.maps.places && inputRef.current && !autocompleteRef.current) {
         try {
@@ -37,7 +37,7 @@ export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> =
           autocomplete.addListener('place_changed', () => {
             const place = autocomplete.getPlace();
             if (place && place.geometry) {
-              onPlaceSelected({
+              onPlaceSelectedRef.current({
                 address: place.formatted_address || '',
                 latitude: place.geometry.location.lat(),
                 longitude: place.geometry.location.lng(),
@@ -60,7 +60,7 @@ export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> =
         if (initializeAutocomplete()) {
           clearInterval(checkInterval);
         }
-      }, 100); // Check every 100ms
+      }, 100);
 
       // Clean up interval after 10 seconds to avoid infinite checking
       const timeout = setTimeout(() => {
@@ -77,14 +77,14 @@ export const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> =
       };
     }
 
-    // Basic cleanup
+    // Basic cleanup on unmount
     return () => {
       if (window.google && window.google.maps && inputRef.current) {
         window.google.maps.event.clearInstanceListeners(inputRef.current);
       }
       autocompleteRef.current = null;
     };
-  }, [onPlaceSelected]);
+  }, []);
 
   return (
     <input
