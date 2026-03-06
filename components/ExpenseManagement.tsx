@@ -1,6 +1,6 @@
 import React, { useState, useContext, useMemo } from 'react';
 import { AppContext, AppContextType, Expense, ExpenseCategory, PaymentMethod } from '../src/types';
-import { PlusCircle, Search, Edit, Trash2, ArrowLeft, Receipt } from 'lucide-react';
+import { PlusCircle, Search, Edit, Trash2, ArrowLeft, Receipt, Download } from 'lucide-react';
 import { formatCurrency } from '../src/utils';
 
 const expenseCategories: ExpenseCategory[] = ['Nómina', 'Servicios', 'Repuestos', 'Combustible', 'Mantenimiento', 'Alquiler', 'Impuestos', 'Marketing', 'Otros'];
@@ -25,7 +25,7 @@ interface ExpenseFormModalProps {
 }
 
 const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({ isOpen, onClose, expenseToEdit }) => {
-    const { addExpense, updateExpense, bankAccounts } = useContext(AppContext) as AppContextType;
+    const { addExpense, updateExpense, bankAccounts, setGlobalSuccess } = useContext(AppContext) as AppContextType;
 
     const [date, setDate] = useState(expenseToEdit ? new Date(expenseToEdit.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
     const [category, setCategory] = useState<ExpenseCategory>(expenseToEdit?.category || 'Otros');
@@ -74,12 +74,14 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({ isOpen, onClose, ex
             supplier: supplier.trim() || undefined,
         };
 
-        if (expenseToEdit) {
-            await updateExpense(expenseToEdit.id, expenseData);
-        } else {
-            await addExpense(expenseData);
-        }
         onClose();
+        if (expenseToEdit) {
+            updateExpense(expenseToEdit.id, expenseData);
+            setGlobalSuccess('Gasto actualizado exitosamente.');
+        } else {
+            addExpense(expenseData);
+            setGlobalSuccess('Gasto registrado exitosamente.');
+        }
     };
 
     if (!isOpen) return null;
@@ -211,7 +213,7 @@ export const ExpenseManagement: React.FC = () => {
     if (!context) {
         return <div className="p-4 bg-red-50 text-red-700 rounded-md text-sm">Error: El contexto de la app no está disponible.</div>;
     }
-    const { expenses, deleteExpense, goHome, bankAccounts } = context;
+    const { expenses, deleteExpense, goHome, bankAccounts, staff } = context;
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -284,6 +286,34 @@ export const ExpenseManagement: React.FC = () => {
         return account ? `${account.bankName}` : null;
     };
 
+    const getCreatedByName = (userId?: string) => {
+        if (!userId) return '';
+        return staff.find(s => s.id === userId)?.name || '';
+    };
+
+    const handleExportCSV = () => {
+        const headers = ['Fecha', 'Categoría', 'Descripción', 'Monto', 'Método Pago', 'Proveedor', 'Creado Por'];
+        const rows = filteredExpenses.map(e => [
+            new Date(e.date).toISOString().split('T')[0],
+            `"${(e.category || '').replace(/"/g, '""')}"`,
+            `"${e.description.replace(/"/g, '""')}"`,
+            e.amount.toFixed(2),
+            `"${(e.paymentMethod || '').replace(/"/g, '""')}"`,
+            `"${(e.supplier || '').replace(/"/g, '""')}"`,
+            `"${getCreatedByName(e.createdById).replace(/"/g, '""')}"`,
+        ]);
+        const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `gastos_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <>
             <button onClick={() => goHome()} className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 mb-6">
@@ -297,13 +327,23 @@ export const ExpenseManagement: React.FC = () => {
                         <Receipt className="text-red-500" />
                         Gastos
                     </h2>
-                    <button
-                        onClick={handleOpenCreate}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600"
-                    >
-                        <PlusCircle size={16} />
-                        <span>Registrar Gasto</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleExportCSV}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                            title="Exportar gastos filtrados a CSV"
+                        >
+                            <Download size={16} />
+                            <span>Exportar CSV</span>
+                        </button>
+                        <button
+                            onClick={handleOpenCreate}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600"
+                        >
+                            <PlusCircle size={16} />
+                            <span>Registrar Gasto</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Filtros */}

@@ -77,6 +77,7 @@ export interface ServiceOrder {
   start?: Date;
   end?: Date;
   calendarId?: string;
+  calendarIds?: string[];
   isGoogleSynced: boolean;
   googleEventId?: string;
   customerId: string;

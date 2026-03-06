@@ -599,7 +599,8 @@ const updateServiceOrder = useCallback(async (orderId: string, updatedData: Part
         if (!originalOrder) return;
 
         const wasRescheduled = (updatedData.start && originalOrder.start && new Date(updatedData.start).getTime() !== new Date(originalOrder.start).getTime()) ||
-                               (updatedData.calendarId && originalOrder.calendarId && updatedData.calendarId !== originalOrder.calendarId);
+                               (updatedData.calendarId && originalOrder.calendarId && updatedData.calendarId !== originalOrder.calendarId) ||
+                               (updatedData.calendarIds && JSON.stringify(updatedData.calendarIds) !== JSON.stringify(originalOrder.calendarIds));
 
         const newOrderState: ServiceOrder = {
             ...originalOrder,

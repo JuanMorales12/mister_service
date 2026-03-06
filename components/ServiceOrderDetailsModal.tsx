@@ -46,7 +46,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   const [serviceNotes, setServiceNotes] = useState('');
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
-  const [calendarId, setCalendarId] = useState('');
+  const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>([]);
   const [status, setStatus] = useState<ServiceOrderStatus>('Pendiente');
   const [isCheckupOnly, setIsCheckupOnly] = useState(false);
   const [customerAddress, setCustomerAddress] = useState('');
@@ -54,7 +54,14 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   const [longitude, setLongitude] = useState<number | undefined>();
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   
-  const technician = useMemo(() => staff.find(s => s.calendarId === order?.calendarId), [staff, order]);
+  const technicianNames = useMemo(() => {
+    if (!order) return '';
+    const ids = order.calendarIds && order.calendarIds.length > 0
+      ? order.calendarIds
+      : order.calendarId ? [order.calendarId] : [];
+    const names = ids.map(cid => staff.find(s => s.calendarId === cid)?.name).filter(Boolean);
+    return names.length > 0 ? names.join(', ') : 'Sin asignar';
+  }, [staff, order]);
   const creator = useMemo(() => staff.find(s => s.id === order?.createdById), [staff, order]);
 
   // Get associated quote and invoice
@@ -66,7 +73,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
       setApplianceType(order.applianceType || '');
       setIssueDescription(order.issueDescription || '');
       setServiceNotes(order.serviceNotes || '');
-      setCalendarId(order.calendarId || '');
+      setSelectedCalendarIds(order.calendarIds && order.calendarIds.length > 0 ? [...order.calendarIds] : order.calendarId ? [order.calendarId] : []);
       setStatus(order.status);
       setIsCheckupOnly(order.isCheckupOnly || false);
       setCustomerAddress(order.customerAddress || '');
@@ -85,14 +92,19 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
   }, [isOpen, order]);
 
   const occupiedTimeSlots = useMemo(() => {
-    if (!calendarId || !appointmentDate || !order) return new Set();
+    if (selectedCalendarIds.length === 0 || !appointmentDate || !order) return new Set();
 
     const occupied = new Set<string>();
     const selectedDayStart = new Date(`${appointmentDate}T00:00:00`);
     const selectedDayEnd = new Date(`${appointmentDate}T23:59:59`);
 
     serviceOrders.forEach(o => {
-      if (o.id !== order.id && o.calendarId === calendarId && o.start && o.status !== 'Cancelado' && o.status !== 'No Agendado') {
+      if (o.id === order.id) return;
+      const orderCalendarIds = o.calendarIds && o.calendarIds.length > 0
+        ? o.calendarIds
+        : o.calendarId ? [o.calendarId] : [];
+      const hasOverlap = orderCalendarIds.some(id => selectedCalendarIds.includes(id));
+      if (hasOverlap && o.start && o.status !== 'Cancelado' && o.status !== 'No Agendado') {
         const orderDate = new Date(o.start);
         if (orderDate >= selectedDayStart && orderDate <= selectedDayEnd) {
           occupied.add(orderDate.toTimeString().substring(0, 5));
@@ -100,38 +112,48 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
       }
     });
     return occupied;
-  }, [calendarId, appointmentDate, serviceOrders, order]);
+  }, [selectedCalendarIds, appointmentDate, serviceOrders, order]);
 
   useEffect(() => {
-    if (isEditing && calendarId && appointmentDate) {
-      const selectedCalendar = calendars.find(c => c.id === calendarId);
+    if (isEditing && selectedCalendarIds.length > 0 && appointmentDate) {
       const dayOfWeek = new Date(appointmentDate).getUTCDay();
-      const dayAvailability = selectedCalendar?.availability?.find(d => d.dayOfWeek === dayOfWeek);
-      const slots = dayAvailability?.slots || [];
 
-      // Generar horas disponibles de 9:00 a 18:00 (cada hora) dentro de los slots configurados
-      const hourlySlots: string[] = [];
+      // Compute intersection of available slots across all selected calendars
+      let commonHourlySlots: string[] | null = null;
+      for (const cId of selectedCalendarIds) {
+        const cal = calendars.find(c => c.id === cId);
+        if (!cal) {
+          commonHourlySlots = [];
+          break;
+        }
+        const dayAvailability = cal.availability?.find(d => d.dayOfWeek === dayOfWeek);
+        const slots = dayAvailability?.slots || [];
+        const hourlySlots: string[] = [];
 
-      for (let hour = 9; hour <= 18; hour++) {
-        const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+        for (let hour = 9; hour <= 18; hour++) {
+          const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+          const isWithinSlot = slots.some(slot => {
+            const [startHour] = slot.startTime.split(':').map(Number);
+            const [endHour] = slot.endTime.split(':').map(Number);
+            return hour >= startHour && hour <= endHour;
+          });
+          if (isWithinSlot) {
+            hourlySlots.push(timeStr);
+          }
+        }
 
-        // Verificar si esta hora está dentro de algún slot configurado
-        const isWithinSlot = slots.some(slot => {
-          const [startHour] = slot.startTime.split(':').map(Number);
-          const [endHour] = slot.endTime.split(':').map(Number);
-          return hour >= startHour && hour <= endHour;
-        });
-
-        if (isWithinSlot) {
-          hourlySlots.push(timeStr);
+        if (commonHourlySlots === null) {
+          commonHourlySlots = hourlySlots;
+        } else {
+          commonHourlySlots = commonHourlySlots.filter(s => hourlySlots.includes(s));
         }
       }
 
-      setAvailableTimeSlots(hourlySlots);
+      setAvailableTimeSlots((commonHourlySlots || []).sort());
     } else {
       setAvailableTimeSlots([]);
     }
-  }, [isEditing, calendarId, appointmentDate, calendars]);
+  }, [isEditing, selectedCalendarIds, appointmentDate, calendars]);
 
   const handleSave = async () => {
     if (!order) return;
@@ -148,7 +170,8 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                 serviceNotes,
                 start,
                 end,
-                calendarId,
+                calendarId: selectedCalendarIds[0] || order.calendarId,
+                calendarIds: selectedCalendarIds,
                 status,
                 isCheckupOnly,
                 customerAddress,
@@ -171,7 +194,7 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
         setApplianceType(order.applianceType || '');
         setIssueDescription(order.issueDescription || '');
         setServiceNotes(order.serviceNotes || '');
-        setCalendarId(order.calendarId || '');
+        setSelectedCalendarIds(order.calendarIds && order.calendarIds.length > 0 ? [...order.calendarIds] : order.calendarId ? [order.calendarId] : []);
         setStatus(order.status);
         setIsCheckupOnly(order.isCheckupOnly || false);
         setCustomerAddress(order.customerAddress || '');
@@ -291,15 +314,46 @@ export const ServiceOrderDetailsModal: React.FC<ServiceOrderDetailsModalProps> =
                         </div>
                         <div className="sm:col-span-2">
                             <label className="label-style">Asignar a Personal</label>
-                            <select value={calendarId} onChange={e => setCalendarId(e.target.value)} className="input-style">
-                                {assignableStaff.map(tech => <option key={tech.id} value={tech.calendarId}>{tech.name}</option>)}
-                            </select>
+                            {selectedCalendarIds.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1.5 mb-2">
+                                {selectedCalendarIds.map(cId => {
+                                  const t = staff.find(s => s.calendarId === cId);
+                                  return (
+                                    <span key={cId} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800">
+                                      {t?.name || 'Desconocido'}
+                                      <button type="button" onClick={() => setSelectedCalendarIds(selectedCalendarIds.filter(id => id !== cId))} className="ml-0.5 hover:text-sky-600">
+                                        &times;
+                                      </button>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <div className="mt-1 space-y-1 max-h-32 overflow-y-auto border border-slate-300 rounded-md p-2">
+                              {assignableStaff.map(tech => (
+                                <label key={tech.id} className={`flex items-center gap-2.5 px-2 py-1.5 cursor-pointer hover:bg-sky-50 rounded transition-colors ${selectedCalendarIds.includes(tech.calendarId) ? 'bg-sky-50' : ''}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedCalendarIds.includes(tech.calendarId)}
+                                    onChange={e => {
+                                      if (e.target.checked) {
+                                        setSelectedCalendarIds([...selectedCalendarIds, tech.calendarId]);
+                                      } else {
+                                        setSelectedCalendarIds(selectedCalendarIds.filter(id => id !== tech.calendarId));
+                                      }
+                                    }}
+                                    className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500"
+                                  />
+                                  <span className="text-sm text-slate-700">{tech.name}</span>
+                                </label>
+                              ))}
+                            </div>
                         </div>
                     </>
                  ) : (
                     <>
                         <p className="flex items-center gap-2"><CalendarIcon size={14}/> {order.start ? new Date(order.start).toLocaleString('es-ES', { dateStyle: 'full', timeStyle: 'short' }) : 'No agendado'}</p>
-                        <p className="flex items-center gap-2"><Wrench size={14}/> <strong>Técnico:</strong> {technician?.name || 'Sin asignar'}</p>
+                        <p className="flex items-center gap-2"><Wrench size={14}/> <strong>Técnico:</strong> {technicianNames}</p>
                     </>
                  )}
               </div>

@@ -29,7 +29,9 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
   const [applianceType, setApplianceType] = useState('');
   const [issueDescription, setIssueDescription] = useState('');
   
-  const [calendarId, setCalendarId] = useState('');
+  const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>([]);
+  const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
+  const staffDropdownRef = React.useRef<HTMLDivElement>(null);
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
@@ -42,15 +44,19 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
   }), [staff, calendars]);
   
   const occupiedTimeSlots = useMemo(() => {
-    if (!calendarId || !appointmentDate) return new Set();
+    if (selectedCalendarIds.length === 0 || !appointmentDate) return new Set();
 
     const occupied = new Set<string>();
     const selectedDayStart = new Date(`${appointmentDate}T00:00:00`);
     const selectedDayEnd = new Date(`${appointmentDate}T23:59:59`);
 
     serviceOrders.forEach(order => {
+        const orderCalendarIds = order.calendarIds && order.calendarIds.length > 0
+            ? order.calendarIds
+            : order.calendarId ? [order.calendarId] : [];
+        const hasOverlap = orderCalendarIds.some(id => selectedCalendarIds.includes(id));
         if (
-            order.calendarId === calendarId &&
+            hasOverlap &&
             order.start &&
             order.status !== 'Cancelado' &&
             order.status !== 'No Agendado'
@@ -65,7 +71,18 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
     });
 
     return occupied;
-}, [calendarId, appointmentDate, serviceOrders]);
+}, [selectedCalendarIds, appointmentDate, serviceOrders]);
+
+  // Close staff dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (staffDropdownRef.current && !staffDropdownRef.current.contains(event.target as Node)) {
+        setIsStaffDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const resetForm = useCallback(() => {
     setSelectedCustomerId('');
@@ -80,7 +97,8 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
     setLongitude(undefined);
     setApplianceType('');
     setIssueDescription('');
-    setCalendarId('');
+    setSelectedCalendarIds([]);
+    setIsStaffDropdownOpen(false);
     setAppointmentDate('');
     setAppointmentTime('');
     setAvailableTimeSlots([]);
@@ -90,7 +108,7 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
     if (isOpen) {
         resetForm();
         if (initialData) {
-            setCalendarId(initialData.calendarId);
+            setSelectedCalendarIds([initialData.calendarId]);
             const startDate = new Date(initialData.start);
             const yyyy = startDate.getFullYear();
             const mm = String(startDate.getMonth() + 1).padStart(2, '0');
@@ -119,45 +137,48 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
   }, [customerSearchQuery, customers, selectedCustomerId]);
 
   useEffect(() => {
-    if (calendarId && appointmentDate) {
-      const selectedCalendar = calendars.find(c => c.id === calendarId);
-      if (!selectedCalendar) {
-        setAvailableTimeSlots([]);
-        return;
-      }
+    if (selectedCalendarIds.length > 0 && appointmentDate) {
       const [year, month, day] = appointmentDate.split('-').map(Number);
-      // Use UTC methods to avoid timezone issues when getting day of week
       const checkDate = new Date(Date.UTC(year, month - 1, day));
       const dayOfWeek = checkDate.getUTCDay();
 
-      const dayAvailability = selectedCalendar?.availability?.find(d => d.dayOfWeek === dayOfWeek);
+      // Compute intersection of available slots across all selected calendars
+      let commonHourlySlots: string[] | null = null;
+      for (const cId of selectedCalendarIds) {
+        const cal = calendars.find(c => c.id === cId);
+        if (!cal) {
+          commonHourlySlots = [];
+          break;
+        }
+        const dayAvailability = cal.availability?.find(d => d.dayOfWeek === dayOfWeek);
+        const slots = dayAvailability?.slots || [];
+        const hourlySlots: string[] = [];
 
-      // Generar horas disponibles de 9:00 a 18:00 (cada hora) dentro de los slots configurados
-      const slots = dayAvailability?.slots || [];
-      const hourlySlots: string[] = [];
+        for (let hour = 9; hour <= 18; hour++) {
+          const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+          const isWithinSlot = slots.some(slot => {
+            const [startHour] = slot.startTime.split(':').map(Number);
+            const [endHour] = slot.endTime.split(':').map(Number);
+            return hour >= startHour && hour <= endHour;
+          });
+          if (isWithinSlot) {
+            hourlySlots.push(timeStr);
+          }
+        }
 
-      // Horas de operación: 9:00 a 18:00
-      for (let hour = 9; hour <= 18; hour++) {
-        const timeStr = `${hour.toString().padStart(2, '0')}:00`;
-
-        // Verificar si esta hora está dentro de algún slot configurado
-        const isWithinSlot = slots.some(slot => {
-          const [startHour] = slot.startTime.split(':').map(Number);
-          const [endHour] = slot.endTime.split(':').map(Number);
-          return hour >= startHour && hour <= endHour;
-        });
-
-        if (isWithinSlot) {
-          hourlySlots.push(timeStr);
+        if (commonHourlySlots === null) {
+          commonHourlySlots = hourlySlots;
+        } else {
+          commonHourlySlots = commonHourlySlots.filter(s => hourlySlots.includes(s));
         }
       }
 
-      setAvailableTimeSlots(hourlySlots);
+      setAvailableTimeSlots((commonHourlySlots || []).sort());
       setAppointmentTime('');
     } else {
       setAvailableTimeSlots([]);
     }
-  }, [calendarId, appointmentDate, calendars]);
+  }, [selectedCalendarIds, appointmentDate, calendars]);
   
   const handleCustomerSelect = (customer: Customer) => {
     setSelectedCustomerId(customer.id);
@@ -178,9 +199,15 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
     setLongitude(details.longitude);
   }, []);
 
+  const handleToggleCalendar = (cId: string) => {
+    setSelectedCalendarIds(prev =>
+      prev.includes(cId) ? prev.filter(id => id !== cId) : [...prev, cId]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName || !customerPhone || !customerAddress || !applianceType || !issueDescription || !calendarId || !appointmentDate || !appointmentTime) {
+    if (!customerName || !customerPhone || !customerAddress || !applianceType || !issueDescription || selectedCalendarIds.length === 0 || !appointmentDate || !appointmentTime) {
       alert("Por favor, completa todos los campos.");
       return;
     }
@@ -188,15 +215,25 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
     const start = new Date(`${appointmentDate}T${appointmentTime}`);
     const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour duration
 
-    const isSlotOccupied = serviceOrders.some(o =>
-        o.calendarId === calendarId &&
-        o.status !== 'Cancelado' &&
-        o.start &&
-        new Date(o.start).getTime() === start.getTime()
+    // Check all selected calendars for conflicts
+    const conflictingCalendarId = selectedCalendarIds.find(cId =>
+      serviceOrders.some(o => {
+        const orderCalendarIds = o.calendarIds && o.calendarIds.length > 0
+          ? o.calendarIds
+          : o.calendarId ? [o.calendarId] : [];
+        return orderCalendarIds.includes(cId) &&
+          o.status !== 'Cancelado' &&
+          o.start &&
+          new Date(o.start).getTime() === start.getTime();
+      })
     );
 
-    if (isSlotOccupied) {
-        alert("Este horario ya está ocupado para el técnico seleccionado. Por favor, elige otro horario.");
+    if (conflictingCalendarId) {
+        const conflictTech = assignableStaff.find(s => {
+            const cal = calendars.find(c => c.id === s.calendarId);
+            return cal?.id === conflictingCalendarId;
+        });
+        alert(`Este horario ya está ocupado para ${conflictTech?.name || 'el técnico seleccionado'}. Por favor, elige otro horario.`);
         return;
     }
 
@@ -213,7 +250,8 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
         issueDescription,
         start,
         end,
-        calendarId
+        calendarId: selectedCalendarIds[0],
+        calendarIds: selectedCalendarIds,
       };
 
       await addServiceOrder(orderData);
@@ -316,23 +354,67 @@ export const CreateAppointmentModal: React.FC<CreateAppointmentModalProps> = ({ 
            <fieldset className="border p-4 rounded-md">
             <legend className="text-lg font-semibold px-2 text-slate-600">Programación y Asignación</legend>
             <div className="space-y-4 mt-2">
-                <div>
-                    <label htmlFor="create-calendarId" className="label-style"><b>1. Asignar a Personal</b></label>
-                    <select id="create-calendarId" value={calendarId} onChange={e => setCalendarId(e.target.value)} required className="mt-1 input-style">
-                        <option value="" disabled>Seleccionar un miembro del personal</option>
-                        {assignableStaff.map(tech => {
-                            const cal = calendars.find(c => c.id === tech.calendarId);
-                            return cal ? <option key={cal.id} value={cal.id}>{tech.name}</option> : null;
+                <div ref={staffDropdownRef}>
+                    <label className="label-style"><b>1. Asignar a Personal</b></label>
+                    {selectedCalendarIds.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1.5 mb-2">
+                        {selectedCalendarIds.map(cId => {
+                          const tech = assignableStaff.find(s => calendars.find(c => c.id === cId && c.id === s.calendarId));
+                          const techName = tech?.name || 'Desconocido';
+                          return (
+                            <span key={cId} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800">
+                              {techName}
+                              <button type="button" onClick={() => handleToggleCalendar(cId)} className="ml-0.5 hover:text-sky-600">
+                                <X size={12} />
+                              </button>
+                            </span>
+                          );
                         })}
-                    </select>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsStaffDropdownOpen(!isStaffDropdownOpen)}
+                      className="mt-1 input-style text-left flex items-center justify-between"
+                    >
+                      <span className={selectedCalendarIds.length === 0 ? 'text-slate-400' : 'text-slate-700'}>
+                        {selectedCalendarIds.length === 0
+                          ? 'Seleccionar miembros del personal'
+                          : `${selectedCalendarIds.length} seleccionado${selectedCalendarIds.length > 1 ? 's' : ''}`}
+                      </span>
+                      <svg className={`w-4 h-4 text-slate-400 transition-transform ${isStaffDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {isStaffDropdownOpen && (
+                      <div className="mt-1 border border-slate-300 rounded-md shadow-sm max-h-48 overflow-y-auto bg-white z-10 relative">
+                        {assignableStaff.map(tech => {
+                          const cal = calendars.find(c => c.id === tech.calendarId);
+                          if (!cal) return null;
+                          const isChecked = selectedCalendarIds.includes(cal.id);
+                          return (
+                            <label
+                              key={cal.id}
+                              className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-sky-50 transition-colors ${isChecked ? 'bg-sky-50' : ''}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleToggleCalendar(cal.id)}
+                                className="h-4 w-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500"
+                              />
+                              <span className="text-sm text-slate-700">{tech.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                 </div>
                 <div>
                     <label htmlFor="create-date" className="label-style"><b>2. Fecha de la Cita</b></label>
-                    <input type="date" id="create-date" value={appointmentDate} onChange={e => setAppointmentDate(e.target.value)} required className="mt-1 input-style" disabled={!calendarId} min={new Date().toISOString().split('T')[0]} />
+                    <input type="date" id="create-date" value={appointmentDate} onChange={e => setAppointmentDate(e.target.value)} required className="mt-1 input-style" disabled={selectedCalendarIds.length === 0} min={new Date().toISOString().split('T')[0]} />
                 </div>
                  <div>
                     <label className="label-style"><b>3. Hora de Inicio</b></label>
-                    {calendarId && appointmentDate ? (
+                    {selectedCalendarIds.length > 0 && appointmentDate ? (
                         availableTimeSlots.length > 0 ? (
                             <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
                                 {availableTimeSlots.map((time) => {

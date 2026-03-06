@@ -124,7 +124,7 @@ export const TechnicianCalendarView: React.FC = () => {
         const rangeEnd = new Date(dateRange[1]);
         rangeEnd.setHours(23,59,59,999);
 
-        return serviceOrders.filter(order => order.calendarId === techCalendar.id && order.start && new Date(order.start) >= rangeStart && new Date(order.start) <= rangeEnd);
+        return serviceOrders.filter(order => (order.calendarIds?.includes(techCalendar.id) || order.calendarId === techCalendar.id) && order.start && new Date(order.start) >= rangeStart && new Date(order.start) <= rangeEnd);
     }, [displayedTechId, dateRange, serviceOrders, staff, calendars]);
 
     // Estadísticas de casos por técnico
@@ -142,7 +142,7 @@ export const TechnicianCalendarView: React.FC = () => {
         rangeEnd.setHours(23,59,59,999);
 
         const ordersInRange = serviceOrders.filter(order =>
-            order.calendarId === techCalendar.id &&
+            (order.calendarIds?.includes(techCalendar.id) || order.calendarId === techCalendar.id) &&
             order.start &&
             new Date(order.start) >= rangeStart &&
             new Date(order.start) <= rangeEnd &&
